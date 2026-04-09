@@ -33,6 +33,30 @@ const COOKIE_NAMES = {
   USER: "user",
 } as const;
 
+// ✅ Temporary user ID mapping until /me endpoint is available
+const USER_ID_MAP: Record<string, string> = {
+  "admin": "e3af12c2-de09-47d1-9d0e-b25a214274f7",
+  // Add more users here as needed
+};
+
+// ✅ Decode JWT to get username
+const decodeJWT = (token: string): { sub?: string; roles?: string[]; sessionId?: string } | null => {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error("Failed to decode JWT:", e);
+    return null;
+  }
+};
+
 const clearAuthCookies = () => {
   if (typeof window === "undefined") return;
 
@@ -72,31 +96,82 @@ const authSlice = createSlice({
   reducers: {
     login(
       state,
-      action: PayloadAction<
-        User & {
-          accessToken?: string;
-          sessionId?: string;
-          refreshToken?: string;
-        }
-      >
+      action: PayloadAction<{
+        token?: string;
+        accessToken?: string;
+        sessionId?: string;
+        refreshToken?: string;
+        type?: string;
+        // User data if provided
+        userId?: string;
+        id?: string;
+        username?: string;
+        name?: string;
+        email?: string;
+        role?: string;
+        roles?: string[];
+        [key: string]: any;
+      }>
     ) {
-      const { accessToken, sessionId, refreshToken, ...userData } = action.payload;
+      const { 
+        token, 
+        accessToken, 
+        sessionId, 
+        refreshToken,
+        ...userData 
+      } = action.payload;
+
+      const actualToken = token || accessToken;
+
+      // ✅ Decode JWT to get username and roles
+      let username = userData.username;
+      let roles = userData.roles || [];
+      
+      if (actualToken) {
+        const decoded = decodeJWT(actualToken);
+        console.log("Decoded JWT:", decoded);
+        
+        if (decoded) {
+          username = username || decoded.sub;
+          roles = roles.length ? roles : (decoded.roles || []);
+        }
+      }
+
+      // ✅ Get user ID from mapping or provided data
+      let userId = userData.userId || userData.id;
+      
+      if (!userId && username) {
+        userId = USER_ID_MAP[username];
+        console.log(`📋 Using mapped userId for ${username}: ${userId}`);
+      }
+
+      if (!userId) {
+        console.warn("⚠️ No userId found! Using username as fallback.");
+        userId = username || "unknown";
+      }
+
+      // ✅ Determine role
+      const role = roles.includes("ADMIN") ? "admin" : "member";
 
       const user: User = {
-        id: userData.id,
-        username: userData.username,
-        name: userData.name,
-        email: userData.email,
-        role: userData.role,
+        id: userId,
+        userId: userId,
+        username: username || "unknown",
+        name: userData.name || username || "User",
+        email: userData.email || "",
+        role: role as "admin" | "member",
         system: userData.system,
-        isActive: userData.isActive,
+        isActive: userData.isActive ?? true,
         club: userData.club,
         phone: userData.phone,
+        roles: roles,
       };
+
+      console.log("✅ Constructed user object:", user);
 
       state.isAuthenticated = true;
       state.user = user;
-      state.accessToken = accessToken || null;
+      state.accessToken = actualToken || null;
       state.sessionId = sessionId || null;
       state.refreshToken = refreshToken || null;
       state.hydrated = true;
@@ -104,8 +179,8 @@ const authSlice = createSlice({
       if (typeof window !== "undefined") {
         clearAuthCookies();
 
-        if (accessToken) {
-          Cookies.set(COOKIE_NAMES.ACCESS_TOKEN, accessToken, {
+        if (actualToken) {
+          Cookies.set(COOKIE_NAMES.ACCESS_TOKEN, actualToken, {
             ...COOKIE_CONFIG,
             expires: 7,
           });
@@ -160,7 +235,7 @@ const authSlice = createSlice({
             state.accessToken = accessToken;
             state.sessionId = sessionId || null;
             state.refreshToken = refreshToken || null;
-            console.log("Auth state hydrated from cookies");
+            console.log("Auth state hydrated from cookies, user:", user);
           } else {
             console.log("No valid auth cookies found");
           }

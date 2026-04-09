@@ -4,6 +4,7 @@ import LocationsPage from "../admin/locations";
 import FacilitiesPage from "../admin/facilities";
 import TimeslotsPage from "../admin/timeslots";
 import AvailabilityPage from "../admin/slot-availability";
+import ApprovalsPage from "../admin/approvals";
 
 const TABS = [
   { label: "Overview", value: "overview" },
@@ -11,6 +12,8 @@ const TABS = [
   { label: "Facilities", value: "facilities" },
   { label: "Time Slots", value: "timeslots" },
   { label: "Availability", value: "availability" },
+  { label: "Approvals", value: "approvals" },
+
 ];
 
 export default function ManagementPage() {
@@ -43,6 +46,7 @@ export default function ManagementPage() {
       {activeTab === "facilities" && <FacilitiesPage embedded />}
       {activeTab === "timeslots" && <TimeslotsPage embedded />}
       {activeTab === "availability" && <AvailabilityPage embedded />}
+      {activeTab === "approvals" && <ApprovalsPage embedded />}
     </Layout>
   );
 }

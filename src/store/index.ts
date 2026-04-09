@@ -7,6 +7,7 @@ import facilityReducer from "./slices/facilitySlice";
 import slotReducer from "./slices/slotSlice";
 import bookingReducer from "./slices/bookingSlice";
 import userReducer from "./slices/userSlice";
+import paymentReducer from "./slices/paymentSlice";
 
 export const store = configureStore({
   reducer: {
@@ -17,6 +18,7 @@ export const store = configureStore({
     facilities: facilityReducer,
     slot: slotReducer,
     bookings: bookingReducer,
+    payments: paymentReducer,
     users: userReducer,
   },
 });

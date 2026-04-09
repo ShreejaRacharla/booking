@@ -1,6 +1,18 @@
 import { ReactNode } from "react";
 
-// ─── TIME SLOTS ───────────────────────────────────────────────────────────────
+// ─── BADGE ────────────────────────────────────────────────────────────────────
+export type BadgeVariant =
+  | "default"
+  | "pending"
+  | "active"
+  | "inactive"
+  | "available"
+  | "booked"
+  | "blocked"
+  | "submitted"
+  | "success";
+
+// ─── ENTITIES ─────────────────────────────────────────────────────────────────
 
 export interface TimeSlot {
   id: string;
@@ -11,8 +23,6 @@ export interface TimeSlot {
   isActive: boolean;
 }
 
-// ─── LOCATIONS ────────────────────────────────────────────────────────────────
-
 export interface Location {
   id: string;
   name: string;
@@ -20,18 +30,15 @@ export interface Location {
   isActive: boolean;
 }
 
-// ─── CLUBS ────────────────────────────────────────────────────────────────────
-
 export interface Club {
   id: string;
   name: string;
   isActive: boolean;
 }
 
-// ─── FACILITIES ───────────────────────────────────────────────────────────────
-
 export type FacilityType =
   | "BANQUET"
+  | "MEETING"
   | "MEETING_ROOM"
   | "AUDITORIUM"
   | "OUTDOOR";
@@ -46,11 +53,9 @@ export interface Facility {
   isActive: boolean;
 }
 
-// ─── AVAILABILITY SLOTS ───────────────────────────────────────────────────────
-
 export type SlotStatus = "AVAILABLE" | "TEMP_HOLD" | "BOOKED" | "BLOCKED";
 
-export interface slotEntry {
+export interface SlotEntry {
   id: string;
   locationId: string;
   facilityId: string;
@@ -61,33 +66,88 @@ export interface slotEntry {
   blockReason?: string;
 }
 
-// ─── BOOKINGS ─────────────────────────────────────────────────────────────────
-
 export interface BookingSlot {
+  id?: string;
   timeslotId: string;
   timeslotName: string;
   startTime: string;
   endTime: string;
-  status: "AVAILABLE" | "CONFLICT";
+  price?: number;
+  status?: "AVAILABLE" | "CONFLICT";
 }
 
-export type BookingStatus = "PENDING" | "APPROVED" | "REJECTED" | "PAID";
+export type BookingStatus = 
+  | "DRAFT"
+  | "SUBMITTED"
+  | "PENDING"
+  | "PENDING_APPROVAL"
+  | "APPROVED"
+  | "APPROVED_PENDING_PAYMENT"
+  | "CONFIRMED_FULL"
+  | "REJECTED"
+  | "PAID"
+  | "CANCELLED";
+
+export type PaymentStatus =
+  | "PENDING"
+  | "PAID"
+  | "FAILED"
+  | "FLAGGED"
+  | "VERIFIED";
+
+export interface BookingItem {
+  id?: string;
+  facilityId: string;
+  facilityName?: string;
+  eventDate: string;
+  slotId: string;
+  slotName?: string;
+  startTime?: string;
+  endTime?: string;
+  price: number;
+  status?: BookingStatus;
+  isActive?: boolean;
+  alternatives?: BookingItem[];
+}
+
+export interface BookingApproval {
+  id: string;
+  approverUserId: string;
+  levelNumber: number;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  actionTime: string | null;
+  remarks: string | null;
+  isActive: boolean;
+}
 
 export interface Booking {
   id: string;
-  userName: string;
-  userId?: string;
-  locationId: string;
-  facilityId: string;
-  date: string;
-  slots: BookingSlot[];
+  bookingCode?: string;
+  userId: string;
+  userName?: string;
+  userEmail?: string;
+  userPhone?: string;
+  items: BookingItem[];
   totalAmount: number;
   status: BookingStatus;
+  approvals?: BookingApproval[];
+  previousBookingId?: string | null;
+  eventDetails?: {
+    purpose: string;
+    expectedAttendees: number;
+    specialRequirements?: string;
+  };
+  rejectionReason?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  approvedBy?: string;
   createdAt: string;
-  updatedAt?: string;
+  isActive: boolean;
+  // ✅ Payment related fields
+  paymentLink?: string;
+  paymentId?: string;
+  paymentStatus?: PaymentStatus;
 }
-
-// ─── BOOKING DRAFT (for API) ──────────────────────────────────────────────────
 
 export interface BookingDraftItem {
   facilityId: string;
@@ -99,9 +159,14 @@ export interface BookingDraftItem {
 export interface BookingDraftRequest {
   userId: string;
   items: BookingDraftItem[];
+  eventDetails?: {
+    purpose: string;
+    expectedAttendees: number;
+    specialRequirements?: string;
+  };
 }
 
-// ─── USERS ────────────────────────────────────────────────────────────────────
+// ─── USER ─────────────────────────────────────────────────────────────────────
 
 export type UserRole = "admin" | "member";
 
@@ -115,8 +180,25 @@ export interface User {
   isActive?: boolean;
   club?: string;
   phone?: string;
-  userId?: string; // API compatibility
-  roles?: any[]; // API compatibility
+  userId?: string;
+  roles?: any[];
+}
+
+// ─── APPROVALS / PAYMENTS ─────────────────────────────────────────────────────
+
+export interface ApprovalAction {
+  bookingId: string;
+  action: "approve" | "reject";
+  approverUserId: string;
+  reason?: string;
+  alternatives?: BookingItem[];
+}
+
+export interface PaymentVerification {
+  bookingId: string;
+  paymentId: string;
+  status: "verified" | "flagged" | "rejected";
+  notes?: string;
 }
 
 // ─── AVAILABILITY ─────────────────────────────────────────────────────────────
@@ -164,23 +246,25 @@ export interface UnblockAvailabilityRequest {
   slots: { date: string; slotId: string }[];
 }
 
-// ─── MASTER DATA ──────────────────────────────────────────────────────────────
-
 export interface MasterDataRequest {
   clubs: { name: string }[];
   locations: {
     name: string;
     approverUserName: string;
-    facilities: { name: string; type: string; capacity: number }[];
+    facilities: {
+      name: string;
+      type: string;
+      capacity: number;
+    }[];
   }[];
 }
 
-// ─── TABLE & FORM COMPONENTS ──────────────────────────────────────────────────
+// ─── TABLE ────────────────────────────────────────────────────────────────────
 
 export interface Column {
   key: string;
   label: string;
-  render?: (value: any, row: any, index: number) => ReactNode;
+  render?: (value: any, row: any, index?: number) => ReactNode;
 }
 
 export interface SelectOption {

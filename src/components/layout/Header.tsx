@@ -18,10 +18,10 @@ import {
 
 const NAV_LINKS = [
   { label: "Dashboard", href: "/", icon: Home },
-  { label: "Bookings", href: "/bookings", icon: Calendar },
-  { label: "Facilities", href: "/facilities", icon: Building2 },
-  { label: "Time Slots", href: "/timeslots", icon: Clock },
-  { label: "Locations", href: "/locations", icon: MapPin },
+  { label: "Bookings", href: "/user/booking", icon: Calendar },
+  { label: "Booking Status", href: "/user/booking-status", icon: Building2 },
+  // { label: "Booking Detail", href: "/user/booking-detail", icon: Clock },
+  { label: "Payment", href: "/user/payment", icon: MapPin },
   { label: "Management", href: "/management", icon: Settings },
 ]
 

@@ -12,6 +12,7 @@ import {
   Clock, MapPin, Building2, CalendarDays,
   CheckCircle2, AlertCircle, TrendingUp,
 } from 'lucide-react'
+import PageHeader from '../layout/PageHeader'
 
 interface DashboardData {
   locations: number
@@ -173,8 +174,6 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
     setIsMounted(true)
   }, [])
 
-  // Exact v2 signature from ResponsiveGridLayoutProps:
-  // onLayoutChange?: (layout: Layout, layouts: ResponsiveLayouts) => void
   const handleLayoutChange = useCallback(
     (_layout: Layout, allLayouts: ResponsiveLayouts) => {
       setLayouts(allLayouts)
@@ -243,7 +242,11 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
   }
 
   return (
-    <div className="select-none w-full">
+    <div className="select-none w-full p-4">
+      <PageHeader
+        title="Dashboard"
+        // subtitle="Select facility, date and time slots"
+      />
       <ResponsiveGridLayout
               className="layout"
               width={1200}

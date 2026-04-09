@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import customAxios from '../../utils/customAxios'
 import DashboardGrid from '../../components/dashboard/DashboardGrid'
-import DashboardHeader from '../../components/dashboard/DashboardHeader'
+import Header from '../../components/layout/Header'
 
 export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -48,7 +48,7 @@ export default function DashboardPage() {
 
   return (
     <div className="animate-fade-in">
-      <DashboardHeader />
+      <Header />
       <DashboardGrid initialData={dashboardData} />
     </div>
   )

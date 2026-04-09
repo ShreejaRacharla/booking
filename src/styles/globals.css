@@ -17,23 +17,23 @@
   
   /* System Colors */
   --color-background: #ffffff;
-  --color-background-dark: #0f172a;
+  /* --color-background-dark: #0f172a; */
   --color-foreground: #0f172a;
-  --color-foreground-dark: #f1f5f9;
+  /* --color-foreground-dark: #f1f5f9; */
   --color-border: #e2e8f0;
-  --color-border-dark: #334155;
+  /* --color-border-dark: #334155; */
   
   /* Card Colors */
   --color-card: #ffffff;
-  --color-card-dark: #1e293b;
+  /* --color-card-dark: #1e293b; */
   --color-card-foreground: #0f172a;
-  --color-card-foreground-dark: #f1f5f9;
+  /* --color-card-foreground-dark: #f1f5f9; */
   
   /* Muted Colors */
   --color-muted: #f1f5f9;
-  --color-muted-dark: #1e293b;
+  /* --color-muted-dark: #1e293b; */
   --color-muted-foreground: #64748b;
-  --color-muted-foreground-dark: #94a3b8;
+  /* --color-muted-foreground-dark: #94a3b8; */
   
   /* Primary Colors */
   --color-primary: #003DA5;
@@ -41,15 +41,15 @@
   
   /* Secondary Colors */
   --color-secondary: #f1f5f9;
-  --color-secondary-dark: #1e293b;
+  /* --color-secondary-dark: #1e293b; */
   --color-secondary-foreground: #0f172a;
-  --color-secondary-foreground-dark: #f1f5f9;
+  /* --color-secondary-foreground-dark: #f1f5f9; */
   
   /* Accent Colors */
   --color-accent: #f1f5f9;
-  --color-accent-dark: #1e293b;
+  /* --color-accent-dark: #1e293b; */
   --color-accent-foreground: #0f172a;
-  --color-accent-foreground-dark: #f1f5f9;
+  /* --color-accent-foreground-dark: #f1f5f9; */
   
   /* Destructive Colors */
   --color-destructive: #ef4444;
@@ -93,13 +93,15 @@
     line-height: 1.5;
   }
   
-  /* Dark mode */
+  /* DARK MODE REMOVED */
+  /*
   @media (prefers-color-scheme: dark) {
     body {
       background-color: var(--color-background-dark);
       color: var(--color-foreground-dark);
     }
   }
+  */
 
   h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
@@ -135,6 +137,8 @@
   background-color: var(--color-rotary-darkgray);
 }
 
+/* DARK MODE SCROLLBAR REMOVED */
+/*
 @media (prefers-color-scheme: dark) {
   ::-webkit-scrollbar-thumb {
     background-color: rgba(148, 163, 184, 0.3);
@@ -144,6 +148,7 @@
     background-color: rgba(148, 163, 184, 0.5);
   }
 }
+*/
 
 /* Dashboard Tile Styles */
 .tile {
@@ -164,6 +169,8 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
+/* DARK MODE TILE REMOVED */
+/*
 @media (prefers-color-scheme: dark) {
   .tile {
     background: linear-gradient(
@@ -179,6 +186,7 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
   }
 }
+*/
 
 /* React Grid Layout Styles */
 .react-grid-layout {
@@ -371,12 +379,15 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+/* DARK MODE GLASS REMOVED */
+/*
 @media (prefers-color-scheme: dark) {
   .glass-effect {
     background: rgba(30, 41, 59, 0.3);
     border-color: rgba(51, 65, 85, 0.3);
   }
 }
+*/
 
 .shadow-glow {
   box-shadow: 0 0 20px rgba(1, 180, 231, 0.3);
