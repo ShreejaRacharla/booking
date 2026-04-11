@@ -1,4 +1,3 @@
-// pages/user/booking-status.tsx
 import { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useRouter } from "next/router";
@@ -14,12 +13,12 @@ import {
   Button,
   Badge,
 } from "../../components";
-import { 
-  Loader2, 
-  Eye, 
-  Calendar, 
-  Clock, 
-  CreditCard, 
+import {
+  Loader2,
+  Eye,
+  Calendar,
+  Clock,
+  CreditCard,
   CheckCircle2,
   XCircle,
   AlertCircle,
@@ -29,7 +28,6 @@ import {
   User
 } from "lucide-react";
 
-// Utility to decode JWT
 const decodeToken = (token: string) => {
   try {
     const base64Url = token.split('.')[1];
@@ -47,92 +45,89 @@ const decodeToken = (token: string) => {
   }
 };
 
-// Get user ID from cookies
 const getUserIdFromToken = (): string | null => {
   if (typeof window === 'undefined') return null;
-  
+
   const cookies = document.cookie.split(';');
   const accessTokenCookie = cookies.find(c => c.trim().startsWith('accessToken='));
-  
+
   if (!accessTokenCookie) return null;
-  
+
   const token = accessTokenCookie.split('=')[1];
   const decoded = decodeToken(token);
-  
+
   return decoded?.id || decoded?.userId || decoded?.sub || null;
 };
 
-// Column type for Table
 interface Column {
   key: string;
   label: string;
   render?: (value: any, row: any) => React.ReactNode;
 }
 
-// Status configuration
-const STATUS_CONFIG: Record<string, { 
-  variant: BadgeVariant; 
-  label: string; 
-  icon: React.ComponentType<{ className?: string }>; 
-  color: string 
+const STATUS_CONFIG: Record<string, {
+  variant: BadgeVariant;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string
 }> = {
-  PENDING_APPROVAL: { 
-    variant: "pending", 
-    label: "Pending Approval", 
+  PENDING_APPROVAL: {
+    variant: "pending",
+    label: "Pending Approval",
     icon: Hourglass,
     color: "text-amber-500"
   },
-  PENDING: { 
-    variant: "pending", 
-    label: "Pending", 
+  PENDING: {
+    variant: "pending",
+    label: "Pending",
     icon: Hourglass,
     color: "text-amber-500"
   },
-  SUBMITTED: { 
-    variant: "pending", 
-    label: "Submitted", 
+  SUBMITTED: {
+    variant: "pending",
+    label: "Submitted",
     icon: Hourglass,
     color: "text-amber-500"
   },
-  APPROVED_PENDING_PAYMENT: { 
-    variant: "pending", 
-    label: "Awaiting Payment", 
+  APPROVED_PENDING_PAYMENT: {
+    variant: "pending",
+    label: "Awaiting Payment",
     icon: CreditCard,
     color: "text-orange-500"
   },
-  APPROVED: { 
-    variant: "active", 
-    label: "Approved", 
+  APPROVED: {
+    variant: "active",
+    label: "Approved",
     icon: CheckCircle2,
     color: "text-emerald-500"
   },
-  CONFIRMED_FULL: { 
-    variant: "active", 
-    label: "Confirmed", 
+  CONFIRMED_FULL: {
+    variant: "active",
+    label: "Confirmed",
     icon: CheckCircle2,
     color: "text-emerald-500"
   },
-  PAID: { 
-    variant: "booked", 
-    label: "Paid", 
+  PAID: {
+    variant: "booked",
+    label: "Paid",
     icon: CheckCircle2,
     color: "text-blue-500"
   },
-  CANCELLED: { 
-    variant: "blocked", 
-    label: "Cancelled", 
+  CANCELLED: {
+    variant: "blocked",
+    label: "Cancelled",
     icon: XCircle,
     color: "text-red-500"
   },
-  REJECTED: { 
-    variant: "inactive", 
-    label: "Rejected", 
+  REJECTED: {
+    variant: "inactive",
+    label: "Rejected",
     icon: AlertCircle,
     color: "text-gray-500"
   },
-  DRAFT: { 
-    variant: "inactive", 
-    label: "Draft", 
+  DRAFT: {
+    variant: "inactive",
+    label: "Draft",
     icon: AlertCircle,
     color: "text-gray-400"
   },
@@ -158,71 +153,61 @@ const STATUS_FILTERS = [
 export default function MyBookingsPage() {
   const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
-  
   const { user, hydrated, isAuthenticated } = useSelector((s: RootState) => s.auth);
   const { myBookings, loading, error } = useSelector((s: RootState) => s.bookings);
-  
   const [statusFilter, setStatusFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Get user ID from token
   useEffect(() => {
     const id = getUserIdFromToken();
     setUserId(id);
     console.log('User ID from token:', id);
   }, []);
 
-  // Hydrate auth state
   useEffect(() => {
     dispatch(hydrate());
   }, [dispatch]);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (hydrated && !isAuthenticated) {
       router.replace("/login");
     }
   }, [hydrated, isAuthenticated, router]);
 
-  // Fetch bookings
   useEffect(() => {
     if (hydrated && isAuthenticated) {
       dispatch(fetchMyBookings());
     }
   }, [dispatch, hydrated, isAuthenticated]);
 
-  // Handle refresh
   const handleRefresh = async () => {
     setRefreshing(true);
     await dispatch(fetchMyBookings());
     setRefreshing(false);
   };
 
-  // Filter bookings by status
-  const filteredBookings = statusFilter === "all" 
-    ? myBookings 
+  const filteredBookings = statusFilter === "all"
+    ? myBookings
     : myBookings.filter((b: Booking) => b.status === statusFilter);
 
-  // Sort by createdAt (newest first)
   const sortedBookings = [...filteredBookings].sort(
-    (a: Booking, b: Booking) => 
+    (a: Booking, b: Booking) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
-  // Calculate stats
   const stats = {
     total: myBookings.length,
-    pending: myBookings.filter((b: Booking) => 
+    pending: myBookings.filter((b: Booking) =>
       b.status === "PENDING_APPROVAL" || b.status === "PENDING"
     ).length,
-    awaitingPayment: myBookings.filter((b: Booking) => 
+    awaitingPayment: myBookings.filter((b: Booking) =>
       b.status === "APPROVED_PENDING_PAYMENT"
     ).length,
-    confirmed: myBookings.filter((b: Booking) => 
+    confirmed: myBookings.filter((b: Booking) =>
       b.status === "CONFIRMED_FULL" || b.status === "PAID"
     ).length,
-    cancelled: myBookings.filter((b: Booking) => 
+    cancelled: myBookings.filter((b: Booking) =>
       b.status === "CANCELLED"
     ).length,
     totalSpent: myBookings
@@ -233,7 +218,6 @@ export default function MyBookingsPage() {
       .reduce((sum: number, b: Booking) => sum + (b.totalAmount || 0), 0),
   };
 
-  // Table columns
   const columns: Column[] = [
     {
       key: "bookingCode",
@@ -255,7 +239,7 @@ export default function MyBookingsPage() {
       render: (items: Booking["items"]) => {
         const first = items?.[0];
         if (!first) return <span className="text-gray-400">No items</span>;
-        
+
         return (
           <div className="text-sm">
             <div className="font-medium text-foreground">
@@ -291,7 +275,7 @@ export default function MyBookingsPage() {
       render: (v: string) => {
         const config = getStatusConfig(v);
         const Icon = config.icon;
-        
+
         return (
           <div className="flex items-center gap-2">
             <Icon className={`w-4 h-4 ${config.color}`} />
@@ -343,8 +327,8 @@ export default function MyBookingsPage() {
         subtitle={`Showing ${filteredBookings.length} of ${myBookings.length} bookings`}
         action={
           <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={handleRefresh}
               disabled={refreshing || loading}
             >
@@ -358,7 +342,6 @@ export default function MyBookingsPage() {
         }
       />
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-gradient-to-r from-blue-500/20 to-cyan-400/20 rounded-xl p-4 border border-white/5">
           <p className="text-xs text-black uppercase tracking-wide">Total</p>
@@ -382,7 +365,6 @@ export default function MyBookingsPage() {
         </div>
       </div>
 
-      {/* User Info Banner */}
       <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-cyan-500/20 rounded-lg px-4 py-3 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-cyan-500 flex items-center justify-center">
@@ -411,24 +393,22 @@ export default function MyBookingsPage() {
         </div>
       </div>
 
-      {/* Filter */}
       <div className="flex items-center gap-3 mb-4">
         <Filter className="w-4 h-4 text-gray-400" />
         <div className="flex gap-2 flex-wrap">
           {STATUS_FILTERS.map(filter => {
-            const count = filter.value === "all" 
-              ? myBookings.length 
+            const count = filter.value === "all"
+              ? myBookings.length
               : myBookings.filter((b: Booking) => b.status === filter.value).length;
-            
+
             return (
               <button
                 key={filter.value}
                 onClick={() => setStatusFilter(filter.value)}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                  statusFilter === filter.value
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${statusFilter === filter.value
                     ? "bg-rotary-royal text-white"
                     : "bg-white/5 text-gray-400 hover:bg-white/10"
-                }`}
+                  }`}
               >
                 {filter.label}
                 <span className="ml-1.5 text-xs opacity-70">({count})</span>
@@ -438,7 +418,6 @@ export default function MyBookingsPage() {
         </div>
       </div>
 
-      {/* Error State */}
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4 flex items-center justify-between">
           <p className="text-red-400 text-sm">{error}</p>
@@ -448,7 +427,6 @@ export default function MyBookingsPage() {
         </div>
       )}
 
-      {/* Bookings Table */}
       <Card padding={false}>
         {loading && !refreshing ? (
           <div className="flex flex-col items-center justify-center py-16">
@@ -459,8 +437,8 @@ export default function MyBookingsPage() {
           <div className="text-center py-16">
             <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <p className="text-gray-400 mb-2">
-              {statusFilter === "all" 
-                ? "You haven't made any bookings yet" 
+              {statusFilter === "all"
+                ? "You haven't made any bookings yet"
                 : `No ${getStatusConfig(statusFilter).label.toLowerCase()} bookings`}
             </p>
             {statusFilter === "all" ? (
@@ -476,8 +454,7 @@ export default function MyBookingsPage() {
         ) : (
           <>
             <Table columns={columns} data={sortedBookings} />
-            
-            {/* Summary Footer */}
+
             <div className="border-t border-white/10 px-6 py-4 bg-white/5">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-400">

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { slotEntry } from "../../types";
+import { SlotEntry } from "../../types";
 import {
   getAvailability,
   getAvailabilityByFacility,
@@ -11,7 +11,7 @@ import {
 } from "../../services/api";
 
 interface slotState {
-  entries: slotEntry[];
+  entries: SlotEntry[];
   loading: boolean;
   error: string | null;
 }
@@ -22,7 +22,6 @@ const initialState: slotState = {
   error: null,
 };
 
-// thunks
 export const fetchAvailability = createAsyncThunk(
   "slot/fetch",
   async (params?: {
@@ -118,7 +117,7 @@ const slotSlice = createSlice({
   name: "slot",
   initialState,
   reducers: {
-    generateslot(state, action: PayloadAction<slotEntry[]>) {
+    generateslot(state, action: PayloadAction<SlotEntry[]>) {
       const newEntries = action.payload.filter(
         (ne) =>
           !state.entries.some(
@@ -153,7 +152,7 @@ const slotSlice = createSlice({
     },
     updateSlotStatus(
       state,
-      action: PayloadAction<{ id: string; status: slotEntry["status"] }>
+      action: PayloadAction<{ id: string; status: SlotEntry["status"] }>
     ) {
       const entry = state.entries.find((e) => e.id === action.payload.id);
       if (entry) entry.status = action.payload.status;
@@ -169,7 +168,7 @@ const slotSlice = createSlice({
     });
     builder.addCase(fetchAvailability.fulfilled, (state, action) => {
       state.loading = false;
-      const entries: slotEntry[] = Array.isArray(action.payload)
+      const entries: SlotEntry[] = Array.isArray(action.payload)
         ? action.payload
         : action.payload.content ?? action.payload.items ?? [];
       state.entries = entries;
@@ -185,7 +184,7 @@ const slotSlice = createSlice({
     });
     builder.addCase(fetchAvailabilityByFacility.fulfilled, (state, action) => {
       state.loading = false;
-      const entries: slotEntry[] = Array.isArray(action.payload)
+      const entries: SlotEntry[] = Array.isArray(action.payload)
         ? action.payload
         : action.payload.content ?? action.payload.items ?? [];
       state.entries = entries;
@@ -202,7 +201,7 @@ const slotSlice = createSlice({
     });
     builder.addCase(generateAvailabilityAPI.fulfilled, (state, action) => {
       state.loading = false;
-      const newEntries: slotEntry[] = Array.isArray(action.payload)
+      const newEntries: SlotEntry[] = Array.isArray(action.payload)
         ? action.payload
         : action.payload.entries ?? [];
       newEntries.forEach((ne) => {

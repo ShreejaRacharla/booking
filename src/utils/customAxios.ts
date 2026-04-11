@@ -10,10 +10,6 @@ if (!API_BASE_URL) {
 
 console.log("API Base URL:", API_BASE_URL);
 
-// ============================================
-// AXIOS INSTANCE CONFIGURATION
-// ============================================
-
 const customAxios = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -23,22 +19,15 @@ const customAxios = axios.create({
   withCredentials: true,
 });
 
-// REMOVED: SKIP_IDEMPOTENCY_ENDPOINTS - Now sending for all endpoints
-
 const generateIdempotencyKey = (): string => {
   return uuidv4();
 };
-
-// ============================================
-// REQUEST INTERCEPTOR
-// ============================================
 
 customAxios.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const fullUrl = `${config.baseURL}${config.url}`;
     console.log(`[${config.method?.toUpperCase()}] ${fullUrl}`);
 
-    // ✅ Add Bearer token if available (for authenticated endpoints)
     if (typeof window !== "undefined") {
       const accessToken = Cookies.get("accessToken");
       if (accessToken) {
@@ -47,7 +36,6 @@ customAxios.interceptors.request.use(
       }
     }
 
-    // ✅ Add Idempotency-Key to ALL requests (including login, register, etc)
     const idempotencyKey = generateIdempotencyKey();
     config.headers["Idempotency-Key"] = idempotencyKey;
     console.log(`🔑 Idempotency-Key: ${idempotencyKey}`);
@@ -59,10 +47,6 @@ customAxios.interceptors.request.use(
     return Promise.reject(error);
   }
 );
-
-// ============================================
-// RESPONSE INTERCEPTOR
-// ============================================
 
 customAxios.interceptors.response.use(
   (response) => {
@@ -91,13 +75,11 @@ customAxios.interceptors.response.use(
 
     console.error("❌ API Error:", errorDetails);
 
-    // Handle Network Errors
     if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
       console.error("🌐 NETWORK ERROR - Check your connection");
       return Promise.reject(error);
     }
 
-    // Handle 401 Unauthorized with Token Refresh
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
@@ -129,7 +111,6 @@ customAxios.interceptors.response.use(
 
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
-        // ✅ Generate new Idempotency-Key for retry
         const newIdempotencyKey = generateIdempotencyKey();
         originalRequest.headers["Idempotency-Key"] = newIdempotencyKey;
         console.log(`🔑 New Idempotency-Key for retry: ${newIdempotencyKey}`);
@@ -142,7 +123,6 @@ customAxios.interceptors.response.use(
 
         console.log("🔒 Clearing auth data and redirecting to login...");
 
-        // Clear all auth cookies
         const authCookies = [
           "accessToken",
           "refreshToken",
@@ -167,22 +147,18 @@ customAxios.interceptors.response.use(
       }
     }
 
-    // Handle 403 Forbidden
     if (error.response?.status === 403) {
       console.error("🚫 Access Forbidden - You don't have permission");
     }
 
-    // Handle 404 Not Found
     if (error.response?.status === 404) {
       console.error("🔍 Resource Not Found");
     }
 
-    // Handle 500 Server Error
     if (error.response?.status === 500) {
       console.error("💥 Internal Server Error");
     }
 
-    // Handle 428 Precondition Required (missing Idempotency-Key)
     if (error.response?.status === 428) {
       console.error("⚠️ Precondition Required - Idempotency-Key is required");
     }

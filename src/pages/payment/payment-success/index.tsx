@@ -1,12 +1,8 @@
-// src/pages/user/payment-success.tsx
-
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/store";
 import { confirmBookingPayment } from "@/store/slices/bookingSlice";
-
-// ─── Types ─────────────────────────────────────────
 
 interface PaymentSuccessState {
     status: "loading" | "success" | "failed" | "cancelled";
@@ -14,8 +10,6 @@ interface PaymentSuccessState {
     paymentId: string | null;
     errorMessage?: string;
 }
-
-// ─── Component ─────────────────────────────────────
 
 const PaymentSuccessPage = () => {
     const router = useRouter();
@@ -42,7 +36,6 @@ const PaymentSuccessPage = () => {
             razorpay_signature,
         } = router.query;
 
-        // ❗ Cancel case
         if (razorpay_payment_link_status !== "paid") {
             setState({
                 status: "cancelled",
@@ -52,7 +45,6 @@ const PaymentSuccessPage = () => {
             return;
         }
 
-        // ✅ Verify payment
         if (bookingId && razorpay_payment_id && razorpay_signature) {
             dispatch(
                 confirmBookingPayment({
@@ -76,7 +68,6 @@ const PaymentSuccessPage = () => {
                     });
                 })
                 .catch(() => {
-                    // agar paymentId hai → assume success
                     if (razorpay_payment_id) {
                         setState({
                             status: "success",
@@ -98,8 +89,6 @@ const PaymentSuccessPage = () => {
             });
         }
     }, [router.isReady, router.query, dispatch]);
-
-    // ─── UI ─────────────────────────────────────────
 
     if (state.status === "loading") {
         return (
@@ -175,12 +164,11 @@ const PaymentSuccessPage = () => {
         );
     }
 
-    // ❌ Failed
     return (
         <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">
                 <h1 className="text-xl font-bold text-red-600">
-                    Payment Failed ❌
+                    Payment Failed
                 </h1>
                 <p className="text-sm text-gray-500 mt-2">
                     {state.errorMessage}

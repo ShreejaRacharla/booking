@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 
-// ─── BADGE ────────────────────────────────────────────────────────────────────
 export type BadgeVariant =
   | "available"
   | "tempHold"
@@ -13,8 +12,6 @@ export type BadgeVariant =
   | "rejected"
   | "paid"
   | "conflict";
-
-// ─── ENTITIES ─────────────────────────────────────────────────────────────────
 
 export interface TimeSlot {
   id: string;
@@ -145,7 +142,6 @@ export interface Booking {
   approvedBy?: string;
   createdAt: string;
   isActive: boolean;
-  // ✅ Payment related fields
   paymentLink?: string;
   paymentId?: string;
   paymentStatus?: PaymentStatus;
@@ -168,7 +164,6 @@ export interface BookingDraftRequest {
   };
 }
 
-// ─── USER ─────────────────────────────────────────────────────────────────────
 
 export type UserRole = "admin" | "member";
 
@@ -186,8 +181,6 @@ export interface User {
   roles?: any[];
 }
 
-// ─── APPROVALS / PAYMENTS ─────────────────────────────────────────────────────
-
 export interface ApprovalAction {
   bookingId: string;
   action: "approve" | "reject";
@@ -202,8 +195,6 @@ export interface PaymentVerification {
   status: "verified" | "flagged" | "rejected";
   notes?: string;
 }
-
-// ─── AVAILABILITY ─────────────────────────────────────────────────────────────
 
 export interface AvailabilityQueryParams {
   locationId?: string;
@@ -260,8 +251,6 @@ export interface MasterDataRequest {
     }[];
   }[];
 }
-
-// ─── TABLE ────────────────────────────────────────────────────────────────────
 
 export interface Column {
   key: string;

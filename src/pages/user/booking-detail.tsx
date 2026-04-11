@@ -29,8 +29,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-// ─── STATUS MAPS ──────────────────────────────────────────────────────────────
-
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-500",
   SUBMITTED: "bg-yellow-500",
@@ -70,15 +68,10 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Cancelled",
 };
 
-// ─── PAGE ─────────────────────────────────────────────────────────────────────
-
 export default function BookingDetailPage() {
   const dispatch = useDispatch();
   const router = useRouter();
-
-  // ✅ FIX: Wait for router to be ready
   const { isReady, query } = router;
-  
   const rawId = query.id ?? query.bookingId;
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
 
@@ -86,24 +79,21 @@ export default function BookingDetailPage() {
     (s: RootState) => s.bookings
   );
   const user = useSelector((s: RootState) => s.auth.user);
-
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [generatingPayment, setGeneratingPayment] = useState(false);
 
-  // ✅ FIX: Only fetch when router is ready AND id exists
   useEffect(() => {
     if (isReady && id) {
       console.log("🔍 Fetching booking:", id);
       dispatch(fetchBookingById(id) as any);
     }
-    
+
     return () => {
       dispatch(clearCurrentBooking());
     };
   }, [isReady, id, dispatch]);
 
-  // ✅ Debug logs
   useEffect(() => {
     console.log("=== DEBUG ===");
     console.log("Router ready:", isReady);
@@ -114,7 +104,6 @@ export default function BookingDetailPage() {
     console.log("Current Booking:", currentBooking);
   }, [isReady, query, id, loading, error, currentBooking]);
 
-  // ── Router not ready yet ───────────────────────────────────────────────────
   if (!isReady) {
     return (
       <Layout>
@@ -126,7 +115,6 @@ export default function BookingDetailPage() {
     );
   }
 
-  // ── No ID provided ───────────────────────────────────────────────────────
   if (!id) {
     return (
       <Layout>
@@ -141,7 +129,6 @@ export default function BookingDetailPage() {
     );
   }
 
-  // ── Loading state ───────────────────────────────────────────────────────
   if (loading) {
     return (
       <Layout>
@@ -153,7 +140,6 @@ export default function BookingDetailPage() {
     );
   }
 
-  // ── Error state ───────────────────────────────────────────────────────
   if (error) {
     return (
       <Layout>
@@ -168,7 +154,6 @@ export default function BookingDetailPage() {
     );
   }
 
-  // ── No booking found ───────────────────────────────────────────────────────
   if (!currentBooking) {
     return (
       <Layout>
@@ -188,12 +173,9 @@ export default function BookingDetailPage() {
     );
   }
 
-  // ✅ Get status safely
   const status = (currentBooking.status || "DRAFT") as BookingStatus;
   const StatusIcon = STATUS_ICONS[status] ?? AlertCircle;
   const statusLabel = STATUS_LABELS[status] ?? status;
-
-  // ✅ Get approval info
   const approvedApproval = currentBooking.approvals?.find(
     (a) => a.status === "APPROVED"
   );
@@ -201,13 +183,12 @@ export default function BookingDetailPage() {
     (a) => a.status === "REJECTED"
   );
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleCancel = async () => {
     if (!id) return;
     setCancelling(true);
     try {
       await dispatch(cancelBookingAPI(id) as any).unwrap();
-      alert("✅ Booking cancelled successfully");
+      alert("Booking cancelled successfully");
       setCancelModalOpen(false);
       dispatch(fetchBookingById(id) as any);
     } catch (err: any) {
@@ -222,7 +203,7 @@ export default function BookingDetailPage() {
     setGeneratingPayment(true);
     try {
       await dispatch(generatePaymentLinkAPI(id) as any).unwrap();
-      alert("✅ Payment link generated!");
+      alert("Payment link generated!");
       dispatch(fetchBookingById(id) as any);
     } catch (err: any) {
       alert(err?.message || "Failed to generate payment link");
@@ -231,11 +212,9 @@ export default function BookingDetailPage() {
     }
   };
 
-  // ✅ Action availability
   const canCancel = ["DRAFT", "PENDING", "SUBMITTED", "PENDING_APPROVAL"].includes(status);
   const canPay = ["APPROVED", "APPROVED_PENDING_PAYMENT"].includes(status);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <Layout>
       <PageHeader
@@ -244,27 +223,21 @@ export default function BookingDetailPage() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* ── LEFT ── */}
         <div className="lg:col-span-2 space-y-5">
-          {/* Status card */}
           <Card>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-rotary-royal">
                 Booking Status
               </h3>
               <div
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-sm font-medium ${
-                  STATUS_COLORS[status] ?? "bg-gray-500"
-                }`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-sm font-medium ${STATUS_COLORS[status] ?? "bg-gray-500"
+                  }`}
               >
                 <StatusIcon className="w-4 h-4" />
                 {statusLabel}
               </div>
             </div>
-
-            {/* Timeline */}
             <div className="space-y-3">
-              {/* Created */}
               {currentBooking.createdAt && (
                 <TimelineStep
                   icon={<CheckCircle className="w-4 h-4 text-rotary-royal" />}
@@ -274,7 +247,6 @@ export default function BookingDetailPage() {
                 />
               )}
 
-              {/* Approved */}
               {approvedApproval && (
                 <TimelineStep
                   icon={<CheckCircle className="w-4 h-4 text-green-500" />}
@@ -289,7 +261,6 @@ export default function BookingDetailPage() {
                 />
               )}
 
-              {/* Rejected */}
               {rejectedApproval && (
                 <TimelineStep
                   icon={<XCircle className="w-4 h-4 text-red-500" />}
@@ -301,7 +272,6 @@ export default function BookingDetailPage() {
                 />
               )}
 
-              {/* Confirmed/Paid */}
               {status === "CONFIRMED_FULL" && (
                 <TimelineStep
                   icon={<CheckCircle className="w-4 h-4 text-blue-500" />}
@@ -312,7 +282,6 @@ export default function BookingDetailPage() {
             </div>
           </Card>
 
-          {/* Booked Slots */}
           <Card>
             <h3 className="text-base font-bold text-rotary-royal mb-4">
               Booked Slots ({currentBooking.items?.length || 0})
@@ -351,7 +320,6 @@ export default function BookingDetailPage() {
                             </span>
                           )}
                         </div>
-                        {/* Item status */}
                         {item.status && (
                           <div className="mt-2">
                             <Badge
@@ -359,8 +327,8 @@ export default function BookingDetailPage() {
                                 item.status === "APPROVED" || item.status === "CONFIRMED_FULL"
                                   ? "active"
                                   : item.status === "PENDING" || item.status === "PENDING_APPROVAL"
-                                  ? "pending"
-                                  : "inactive"
+                                    ? "pending"
+                                    : "inactive"
                               }
                             >
                               {item.status}
@@ -378,7 +346,6 @@ export default function BookingDetailPage() {
             )}
           </Card>
 
-          {/* Event Details */}
           {currentBooking.eventDetails && (
             <Card>
               <h3 className="text-base font-bold text-rotary-royal mb-4">
@@ -409,7 +376,6 @@ export default function BookingDetailPage() {
           )}
         </div>
 
-        {/* ── RIGHT: Summary & Actions ── */}
         <div className="lg:col-span-1">
           <Card className="sticky top-5">
             <h3 className="text-base font-bold text-rotary-royal mb-4">
@@ -449,7 +415,6 @@ export default function BookingDetailPage() {
               </div>
             </div>
 
-            {/* Payment link */}
             {currentBooking.paymentLink && (
               <div className="mb-4 p-3 bg-rotary-turquoise/10 border border-rotary-turquoise rounded-lg">
                 <div className="text-sm font-medium text-rotary-royal mb-2">
@@ -467,7 +432,6 @@ export default function BookingDetailPage() {
               </div>
             )}
 
-            {/* Action buttons */}
             <div className="space-y-2">
               {canPay && !currentBooking.paymentLink && (
                 <Button
@@ -520,7 +484,6 @@ export default function BookingDetailPage() {
         </div>
       </div>
 
-      {/* Cancel Confirmation Modal */}
       <Modal
         isOpen={cancelModalOpen}
         onClose={() => !cancelling && setCancelModalOpen(false)}
@@ -562,8 +525,6 @@ export default function BookingDetailPage() {
     </Layout>
   );
 }
-
-// ─── HELPER COMPONENTS ──────────────────────────────────────────────────────
 
 function TimelineStep({
   icon,

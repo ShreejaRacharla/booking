@@ -31,7 +31,6 @@ export default function ManagementPage() {
 
       {activeTab === "overview" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Summary cards */}
           {["Locations", "Facilities", "Time Slots", "Availability"].map((item) => (
             <Card key={item}>
               <p className="text-sm text-rotary-darkgray">{item}</p>
@@ -41,7 +40,6 @@ export default function ManagementPage() {
         </div>
       )}
 
-      {/* Inline sub-pages — swap to routing if preferred */}
       {activeTab === "locations" && <LocationsPage embedded />}
       {activeTab === "facilities" && <FacilitiesPage embedded />}
       {activeTab === "timeslots" && <TimeslotsPage embedded />}

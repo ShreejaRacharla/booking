@@ -38,7 +38,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Mobile overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 bg-black/40 z-40 lg:hidden"
@@ -54,7 +53,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           ${isOpen ? "w-[260px]" : "w-[70px]"}
         `}
       >
-        {/* Top bar */}
         <div className="flex items-center px-1 h-14 border-b border-white/10">
           <div className="flex items-center gap-2 flex-1">
             <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
@@ -71,7 +69,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          {/* Toggle button */}
           <button
             onClick={onToggle}
             className="rounded-lg hover:bg-white/10"
@@ -84,7 +81,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 px-2 py-4 space-y-1">
           {NAV_ITEMS.map((item) => {
             const isActive =
@@ -123,7 +119,6 @@ const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        {/* Footer */}
         {isOpen && (
           <div className="px-4 py-3 border-t border-white/10 text-center text-[11px] text-white/40">
             © 2026 Rotary International

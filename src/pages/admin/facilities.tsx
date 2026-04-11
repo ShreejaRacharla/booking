@@ -43,7 +43,6 @@ const EMPTY = {
 export default function FacilitiesPage({ embedded = false }: { embedded?: boolean }) {
   const dispatch = useDispatch();
 
-  // Get all data from Redux slices
   const { items: facilities, loading, error } = useSelector(
     (s: RootState) => s.facilities
   );
@@ -54,22 +53,18 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
     (s: RootState) => s.users
   );
   const user = useSelector((s: RootState) => s.auth.user);
-
-  // Local state
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Facility | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  // Fetch all data on mount
   useEffect(() => {
     dispatch(fetchFacilities() as any);
     dispatch(fetchLocations() as any);
     dispatch(fetchUsers() as any);
   }, [dispatch]);
 
-  // Helper functions to get names from IDs
   const getLocationName = (id: string) => {
     const location = locations.find((l) => l.id === id);
     return location?.name || id;
@@ -80,7 +75,6 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
     return foundUser?.name || "Unknown";
   };
 
-  // Open create modal
   const openCreate = () => {
     setEditing(null);
     setForm({
@@ -91,7 +85,6 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
     setOpen(true);
   };
 
-  // Open edit modal
   const openEdit = (f: Facility) => {
     setEditing(f);
     setForm({
@@ -106,7 +99,6 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
     setOpen(true);
   };
 
-  // Validate form
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Required";
@@ -119,7 +111,6 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
     return Object.keys(e).length === 0;
   };
 
-  // Save facility
   const save = async () => {
     if (!validate()) return;
     setSaving(true);
@@ -157,7 +148,6 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
     }
   };
 
-  // Delete facility
   const handleDelete = async (f: Facility) => {
     if (!confirm(`Are you sure you want to delete "${f.name}"?`)) return;
 
@@ -168,7 +158,6 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
     }
   };
 
-  // Table columns
   const columns: Column[] = [
     { key: "name", label: "Facility" },
     {

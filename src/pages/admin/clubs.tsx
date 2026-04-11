@@ -35,7 +35,6 @@ export default function ClubsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
-  // Fetch clubs on mount
   useEffect(() => {
     dispatch(fetchClubs() as any);
   }, [dispatch]);

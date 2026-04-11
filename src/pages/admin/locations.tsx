@@ -202,9 +202,9 @@ export default function LocationsPage({ embedded = false }: { embedded?: boolean
               filteredUsers.length === 0
                 ? [{ value: "", label: "Loading..." }]
                 : filteredUsers.map((u: any) => ({
-                    value: u.id,
-                    label: u.username,
-                  }))
+                  value: u.id,
+                  label: u.username,
+                }))
             }
             value={form.approverUserId}
             onChange={(e) =>

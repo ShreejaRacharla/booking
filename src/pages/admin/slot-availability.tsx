@@ -60,6 +60,14 @@ const STATUS_LABEL: Record<SlotStatus, string> = {
   BLOCKED: "X",
 };
 
+const getStatusColor = (status: SlotStatus): string => {
+  return STATUS_COLORS[status] || "bg-gray-500 text-white";
+};
+
+const getStatusLabel = (status: SlotStatus): string => {
+  return STATUS_LABEL[status] || "?";
+};
+
 export default function AvailabilityPage({ embedded = false }: { embedded?: boolean }) {
   const dispatch = useDispatch();
   const locations = useSelector((s: RootState) => s.locations.items);
@@ -130,7 +138,7 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
           toDate: gridFilter.toDate,
         }) as any
       ).unwrap();
-      console.log("✅ Fetched availability from API");
+      console.log("Fetched availability from API");
     } catch (err: any) {
       console.error("❌ Failed to fetch availability:", err);
     }
@@ -179,7 +187,7 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
         }) as any
       ).unwrap();
 
-      console.log("✅ Generated availability:", result);
+      console.log("Generated availability:", result);
 
       setGridFilter({
         locationId: genForm.locationId,
@@ -188,7 +196,7 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
         toDate: genForm.toDate,
       });
 
-      alert("✅ Availability generated successfully!");
+      alert("Availability generated successfully!");
     } catch (err: any) {
       console.error("❌ Generation failed:", err);
       alert(err?.message || "Failed to generate availability");
@@ -257,7 +265,7 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
         blockAvailabilityAPI({ facilityId, slots, reason: blockReason }) as any
       ).unwrap();
 
-      console.log("✅ Blocked successfully");
+      console.log("Blocked successfully");
 
       dispatch(
         blockSlots({ ids: Array.from(selectedCells), reason: blockReason })
@@ -286,7 +294,7 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
         unblockAvailabilityAPI({ facilityId, slots }) as any
       ).unwrap();
 
-      console.log("✅ Unblocked successfully");
+      console.log("Unblocked successfully");
 
       dispatch(unblockSlots(Array.from(selectedCells)));
       setSelectedCells(new Set());
@@ -444,11 +452,11 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
               </h3>
               <div className="flex flex-wrap items-center gap-3 text-xs">
                 {(
-                  Object.entries(STATUS_LABEL) as [SlotStatus, string][]
+                  Object.entries(STATUS_LABEL) as Array<[SlotStatus, string]>
                 ).map(([status, label]) => (
                   <span key={status} className="flex items-center gap-1.5">
                     <span
-                      className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold ${STATUS_COLORS[status]}`}
+                      className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold ${getStatusColor(status)}`}
                     >
                       {label}
                     </span>
@@ -514,7 +522,7 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
                           <button
                             onClick={() => toggleCell(entry.id)}
                             className={`w-7 h-7 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                              STATUS_COLORS[entry.status]
+                              getStatusColor(entry.status)
                             } ${
                               sel
                                 ? "ring-2 ring-offset-1 ring-rotary-black scale-110"
@@ -524,7 +532,7 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
                               entry.blockReason ? ` — ${entry.blockReason}` : ""
                             } | ₹${entry.price}`}
                           >
-                            {STATUS_LABEL[entry.status]}
+                            {getStatusLabel(entry.status)}
                           </button>
                         </td>
                       );

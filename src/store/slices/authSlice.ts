@@ -33,13 +33,10 @@ const COOKIE_NAMES = {
   USER: "user",
 } as const;
 
-// ✅ Temporary user ID mapping until /me endpoint is available
 const USER_ID_MAP: Record<string, string> = {
   "admin": "e3af12c2-de09-47d1-9d0e-b25a214274f7",
-  // Add more users here as needed
 };
 
-// ✅ Decode JWT to get username
 const decodeJWT = (token: string): { sub?: string; roles?: string[]; sessionId?: string } | null => {
   try {
     const base64Url = token.split(".")[1];
@@ -102,7 +99,6 @@ const authSlice = createSlice({
         sessionId?: string;
         refreshToken?: string;
         type?: string;
-        // User data if provided
         userId?: string;
         id?: string;
         username?: string;
@@ -123,7 +119,6 @@ const authSlice = createSlice({
 
       const actualToken = token || accessToken;
 
-      // ✅ Decode JWT to get username and roles
       let username = userData.username;
       let roles = userData.roles || [];
       
@@ -137,7 +132,6 @@ const authSlice = createSlice({
         }
       }
 
-      // ✅ Get user ID from mapping or provided data
       let userId = userData.userId || userData.id;
       
       if (!userId && username) {
@@ -150,7 +144,6 @@ const authSlice = createSlice({
         userId = username || "unknown";
       }
 
-      // ✅ Determine role
       const role = roles.includes("ADMIN") ? "admin" : "member";
 
       const user: User = {

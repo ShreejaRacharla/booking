@@ -14,8 +14,6 @@ const initialState: ClubState = {
   error: null,
 };
 
-// ─── ASYNC THUNKS ─────────────────────────────────────────────────────────────
-
 export const fetchClubs = createAsyncThunk("clubs/fetchAll", async () => {
   const response = await getClubs();
   return response.data;
@@ -46,14 +44,11 @@ export const deleteClubAPI = createAsyncThunk(
   }
 );
 
-// ─── SLICE ────────────────────────────────────────────────────────────────────
-
 const clubSlice = createSlice({
   name: "clubs",
   initialState,
   reducers: {},
   extraReducers: (builder) => {
-    // Fetch All
     builder.addCase(fetchClubs.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -69,7 +64,6 @@ const clubSlice = createSlice({
       state.error = action.error.message || "Failed to fetch clubs";
     });
 
-    // Create
     builder.addCase(createClubAPI.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -83,7 +77,6 @@ const clubSlice = createSlice({
       state.error = action.error.message || "Failed to create club";
     });
 
-    // Update
     builder.addCase(updateClubAPI.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -100,7 +93,6 @@ const clubSlice = createSlice({
       state.error = action.error.message || "Failed to update club";
     });
 
-    // Delete
     builder.addCase(deleteClubAPI.pending, (state) => {
       state.loading = true;
       state.error = null;

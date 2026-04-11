@@ -41,7 +41,6 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (hydrated && isAuthenticated && user) {
-      // Redirect based on role
       const redirectPath = user.role === "admin" ? "/admin/dashboard" : "/user/dashboard";
       router.replace(redirectPath);
     }
@@ -79,7 +78,6 @@ export default function LoginPage() {
         throw new Error("Invalid token format");
       }
 
-      // Determine user role from token
       let userRole: UserRole = "member";
       if (decoded.roles && Array.isArray(decoded.roles)) {
         const roleString = decoded.roles[0]?.toLowerCase();
@@ -99,7 +97,6 @@ export default function LoginPage() {
         system: false,
       };
 
-      // Dispatch login action
       dispatch(
         login({
           ...user,
@@ -111,9 +108,8 @@ export default function LoginPage() {
 
       console.log("Login successful, redirecting based on role...");
 
-      // Role-based redirection
       const redirectPath = userRole === "admin" ? "/admin/dashboard" : "/user/dashboard";
-      
+
       setTimeout(() => {
         router.push(redirectPath);
       }, 100);

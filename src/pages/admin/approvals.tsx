@@ -33,17 +33,15 @@ const filterStatusMap: Record<FilterType, BookingStatus[]> = {
   CANCELLED: ["CANCELLED"],
 };
 
-// ✅ Cookie "accessToken" se JWT decode karke UUID (payload.id) nikalta hai
 function getUserIdFromToken(): string | null {
   try {
-    // "accessToken" cookie dhundo
     const cookies = document.cookie.split(";");
     let token: string | null = null;
 
     for (const cookie of cookies) {
       const parts = cookie.trim().split("=");
       const name = parts[0];
-      const value = parts.slice(1).join("="); // value mein "=" ho sakta hai
+      const value = parts.slice(1).join("=");
       if (name === "accessToken") {
         token = decodeURIComponent(value);
         break;
@@ -55,14 +53,12 @@ function getUserIdFromToken(): string | null {
       return null;
     }
 
-    // JWT: header.payload.signature — sirf payload chahiye (index 1)
     const payloadBase64 = token.split(".")[1];
     if (!payloadBase64) {
       console.error("❌ Invalid JWT format");
       return null;
     }
 
-    // Base64url → Base64 → JSON string
     const base64 = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
     const jsonStr = decodeURIComponent(
       atob(base64)
@@ -72,11 +68,7 @@ function getUserIdFromToken(): string | null {
     );
 
     const payload = JSON.parse(jsonStr);
-
-    // payload.id = UUID (e.g. "e3af12c2-de09-47d1-9d0e-b25a214274f7")
-    // payload.sub = username (e.g. "rufin") — ye UUID nahi hai, use mat karo
     const userId = payload.id || null;
-
     console.log("🔑 JWT payload.id (UUID):", userId);
 
     return userId ? String(userId) : null;
@@ -93,14 +85,11 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
   );
   const locations = useSelector((s: RootState) => s.locations.items);
   const facilities = useSelector((s: RootState) => s.facilities.items);
-
   const [detail, setDetail] = useState<Booking | null>(null);
   const [altOpen, setAltOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [filter, setFilter] = useState<FilterType>("ALL");
   const [actionLoading, setActionLoading] = useState(false);
-
-  // ✅ Decode approverUserId from JWT token (not from Redux state)
   const approverUserId = useMemo(() => getUserIdFromToken(), []);
 
   useEffect(() => {
@@ -181,7 +170,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
     return bookings.filter((b) => filterStatusMap[filterType].includes(b.status)).length;
   };
 
-  // ✅ approverUserId ab JWT se aata hai — UUID hoga, username nahi
   const handleApprove = async (booking: Booking) => {
     console.log("🔐 Approving booking:", booking.id, "with approverUserId (from JWT):", approverUserId);
 
@@ -190,7 +178,7 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
       const result = await dispatch(
         approveBookingAPI({
           bookingId: booking.id,
-          approverUserId: approverUserId,  // ✅ JWT se decoded UUID
+          approverUserId: approverUserId,
         }) as any
       ).unwrap();
 
@@ -340,15 +328,14 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
 
   const content = (
     <>
-      {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-5">
         {filterButtons.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setFilter(key)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${filter === key
-                ? "bg-rotary-royal text-white"
-                : "bg-white text-rotary-darkgray border border-gray-200 hover:border-rotary-royal"
+              ? "bg-rotary-royal text-white"
+              : "bg-white text-rotary-darkgray border border-gray-200 hover:border-rotary-royal"
               }`}
           >
             {label}
@@ -379,7 +366,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
         )}
       </Card>
 
-      {/* Detail Modal */}
       <Modal
         isOpen={!!detail}
         onClose={() => !actionLoading && setDetail(null)}
@@ -433,10 +419,10 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
                     <div
                       key={approval.id || idx}
                       className={`p-3 rounded-lg ${approval.status === "APPROVED"
-                          ? "bg-green-50 border border-green-200"
-                          : approval.status === "REJECTED"
-                            ? "bg-red-50 border border-red-200"
-                            : "bg-yellow-50 border border-yellow-200"
+                        ? "bg-green-50 border border-green-200"
+                        : approval.status === "REJECTED"
+                          ? "bg-red-50 border border-red-200"
+                          : "bg-yellow-50 border border-yellow-200"
                         }`}
                     >
                       <div className="flex items-center justify-between">
@@ -616,7 +602,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
         )}
       </Modal>
 
-      {/* Reject Modal */}
       <Modal
         isOpen={altOpen}
         onClose={() => !actionLoading && setAltOpen(false)}

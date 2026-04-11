@@ -1,6 +1,3 @@
-/**
- * src/store/slices/bookingSlice.ts
- */
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import Cookies from "js-cookie";
 import { Booking, BookingStatus } from "../../types";
@@ -17,8 +14,6 @@ import {
   generatePaymentLink,
 } from "../../services/api";
 import customAxios from "../../utils/customAxios";
-
-// ─── STATE ────────────────────────────────────────────────────────────────────
 
 interface BookingState {
   items: Booking[];
@@ -38,9 +33,6 @@ const initialState: BookingState = {
   error: null,
 };
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-
-/** Get userId (UUID) directly from JWT token — payload.id use karo, sub nahi (sub = username) */
 function getUserIdFromToken(): string | null {
   try {
     const token = Cookies.get("accessToken");
@@ -67,7 +59,6 @@ function getUserIdFromToken(): string | null {
     const decoded = JSON.parse(jsonPayload);
     console.log("🔓 Decoded JWT:", decoded);
 
-    // ✅ FIX: payload.id = UUID, payload.sub = username — sub use mat karo
     const userId = decoded.id || decoded.userId || decoded.user_id || null;
 
     if (userId) {
@@ -100,8 +91,6 @@ function normaliseSingle(payload: any): Booking {
     return payload.data;
   return payload;
 }
-
-// ─── THUNKS ───────────────────────────────────────────────────────────────────
 
 export const fetchBookings = createAsyncThunk(
   "bookings/fetchAll",
@@ -326,8 +315,6 @@ export const confirmBookingPayment = createAsyncThunk(
   }
 );
 
-// ─── SLICE ────────────────────────────────────────────────────────────────────
-
 const bookingSlice = createSlice({
   name: "bookings",
   initialState,
@@ -436,20 +423,15 @@ const bookingSlice = createSlice({
       }
     });
 
-    // ✅ FIX: approveBookingAPI — state.items aur state.myBookings dono update karo
-    // Backend response mein galat/purana status aa sakta hai, isliye
-    // APPROVED_PENDING_PAYMENT force karo aur _bookingId se match karo
     builder.addCase(approveBookingAPI.fulfilled, (state, action) => {
       const payload = action.payload as any;
       const bookingId = payload?._bookingId || normaliseSingle(payload)?.id;
 
       if (bookingId) {
-        // pendingApprovals se remove karo
         state.pendingApprovals = state.pendingApprovals.filter(
           (b) => b.id !== bookingId
         );
 
-        // ✅ state.items mein status update karo
         const itemIdx = state.items.findIndex((b) => b.id === bookingId);
         if (itemIdx !== -1) {
           state.items[itemIdx] = {
@@ -458,7 +440,6 @@ const bookingSlice = createSlice({
           };
         }
 
-        // ✅ state.myBookings mein bhi update karo
         const myIdx = state.myBookings.findIndex((b) => b.id === bookingId);
         if (myIdx !== -1) {
           state.myBookings[myIdx] = {
@@ -467,14 +448,12 @@ const bookingSlice = createSlice({
           };
         }
 
-        // ✅ currentBooking bhi update karo
         if (state.currentBooking !== null && state.currentBooking.id === bookingId) {
           state.currentBooking.status = "APPROVED_PENDING_PAYMENT";
         }
       }
     });
 
-    // ✅ FIX: rejectBookingAPI — state.items bhi update karo
     builder.addCase(rejectBookingAPI.fulfilled, (state, action) => {
       const payload = action.payload as any;
       const bookingId = payload?._bookingId || normaliseSingle(payload)?.id;

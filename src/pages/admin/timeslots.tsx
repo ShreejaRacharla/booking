@@ -28,7 +28,6 @@ export default function TimeslotsPage({ embedded = false }: { embedded?: boolean
   );
 
   const facilities = useSelector((s: RootState) => s.facilities.items);
-
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<TimeSlot | null>(null);
   const [form, setForm] = useState(EMPTY);
@@ -217,14 +216,14 @@ export default function TimeslotsPage({ embedded = false }: { embedded?: boolean
               facilities.length === 0
                 ? [{ value: "", label: "Loading facilities..." }]
                 : [
-                    { value: "", label: "Select a facility" },
-                    ...facilities
-                      .filter((f) => f.isActive)
-                      .map((f) => ({
-                        value: f.id,
-                        label: f.name,
-                      })),
-                  ]
+                  { value: "", label: "Select a facility" },
+                  ...facilities
+                    .filter((f) => f.isActive)
+                    .map((f) => ({
+                      value: f.id,
+                      label: f.name,
+                    })),
+                ]
             }
             value={form.facilityId}
             onChange={(e) => setForm({ ...form, facilityId: e.target.value })}

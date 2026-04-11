@@ -14,7 +14,6 @@ const initialState: FacilityState = {
   error: null,
 };
 
-// Thunks
 export const fetchFacilities = createAsyncThunk(
   "facilities/fetchAll",
   async (_, { rejectWithValue }) => {

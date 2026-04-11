@@ -21,7 +21,6 @@ const initialState: UserState = {
   error: null,
 };
 
-// Fetch users
 export const fetchUsers = createAsyncThunk(
   "users/fetchAll",
   async (_, { rejectWithValue }) => {
@@ -31,7 +30,6 @@ export const fetchUsers = createAsyncThunk(
 
       let rawUsers: any[] = [];
 
-      // Handle different response formats
       if (Array.isArray(res.data)) {
         rawUsers = res.data;
       } else if (res.data?.data && Array.isArray(res.data.data)) {
@@ -42,9 +40,7 @@ export const fetchUsers = createAsyncThunk(
         rawUsers = res.data.items;
       }
 
-      // Map API response to our User interface
       const users: User[] = rawUsers.map((u: any) => {
-        // Try different possible ID fields
         const userId = u.id || u.userId || u.uuid || u.uid || "";
         const userName = u.username || u.name || u.firstName || "";
 
@@ -55,7 +51,7 @@ export const fetchUsers = createAsyncThunk(
         });
 
         return {
-          id: userId, // Use the actual UUID/ID from API
+          id: userId,
           name: userName,
           email: u.email,
           role: u.role || "user",

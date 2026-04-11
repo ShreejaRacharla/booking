@@ -14,7 +14,6 @@ const initialState: LocationState = {
   error: null,
 };
 
-// thunks
 export const fetchLocations = createAsyncThunk(
   "locations/fetchAll",
   async (_, { rejectWithValue }) => {

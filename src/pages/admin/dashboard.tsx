@@ -32,7 +32,7 @@ export default function DashboardPage() {
           timeSlots: timeSlots.length,
           totalBookings: bookings.length,
           pendingApprovals: bookings.filter((b: any) => b.status === 'PENDING').length,
-          availableSlots: 0, // agar API hai to add kar dena
+          availableSlots: 0,
           recentBookings: bookings.slice(0, 5),
         })
 

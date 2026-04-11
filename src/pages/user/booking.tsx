@@ -1,7 +1,3 @@
-/**
- * src/pages/management/booking.tsx
- * Create Booking page
- */
 import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useRouter } from "next/router";
@@ -27,8 +23,6 @@ import { BookingItem } from "../../types";
 import Cookies from "js-cookie";
 import axios from "axios";
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
-
 interface AvailableSlot {
   id: string;
   date: string;
@@ -50,8 +44,6 @@ interface DecodedToken {
   iat?: number;
 }
 
-// ─── HELPER: MANUAL JWT DECODER ───────────────────────────────────────────────
-
 function decodeJWT(token: string): DecodedToken | null {
   try {
     const parts = token.split(".");
@@ -62,7 +54,7 @@ function decodeJWT(token: string): DecodedToken | null {
 
     const payload = parts[1];
     const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    
+
     const jsonPayload = decodeURIComponent(
       atob(base64)
         .split("")
@@ -77,43 +69,37 @@ function decodeJWT(token: string): DecodedToken | null {
   }
 }
 
-// ─── HELPER: GET USER ID FROM TOKEN & API ─────────────────────────────────────
-
 async function getUserIdFromToken(): Promise<string | null> {
   try {
     const token = Cookies.get("accessToken");
-    
+
     if (!token) {
       console.warn("No access token found in cookies");
       return null;
     }
 
     const decoded = decodeJWT(token);
-    
+
     if (!decoded) {
       console.error("Failed to decode token");
       return null;
     }
 
     console.log("🔑 Decoded token:", decoded);
-
-    // Check if token is expired
     if (decoded.exp && decoded.exp * 1000 < Date.now()) {
       console.error("Token has expired");
       return null;
     }
 
-    // CASE 1: Token already has user ID
     const directUserId = decoded.id || decoded.userId || decoded.sub || decoded.user_id;
-    
+
     if (directUserId) {
       console.log("User ID found directly in token:", directUserId);
       return directUserId;
     }
 
-    // CASE 2: Token has username, fetch user ID from API
     const username = decoded.username;
-    
+
     if (!username) {
       console.error("No userId or username found in token. Token structure:", decoded);
       return null;
@@ -121,7 +107,6 @@ async function getUserIdFromToken(): Promise<string | null> {
 
     console.log("🔍 Fetching user ID for username:", username);
 
-    // Fetch user details from API
     const response = await axios.get(
       `${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/users/by-username/${username}`,
       {
@@ -143,16 +128,14 @@ async function getUserIdFromToken(): Promise<string | null> {
 
   } catch (error: any) {
     console.error("Error extracting user ID:", error);
-    
+
     if (error.response?.status === 401) {
       console.error("Unauthorized - token may be invalid");
     }
-    
+
     return null;
   }
 }
-
-// ─── AVAILABILITY PARSER ──────────────────────────────────────────────────────
 
 function parseAvailabilityResponse(
   rawData: any,
@@ -177,7 +160,7 @@ function parseAvailabilityResponse(
     if (entry.slotId && Array.isArray(entry.data)) {
       entry.data.forEach((day: any) => {
         let formattedDate: string;
-        
+
         if (Array.isArray(day.date)) {
           const [year, month, dayNum] = day.date;
           formattedDate = `${year}-${String(month).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
@@ -225,8 +208,6 @@ function parseAvailabilityResponse(
   );
 }
 
-// ─── PAGE ─────────────────────────────────────────────────────────────────────
-
 export default function CreateBookingPage() {
   const dispatch = useDispatch();
   const router = useRouter();
@@ -252,18 +233,17 @@ export default function CreateBookingPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  // Extract user ID from token on mount
   useEffect(() => {
     const fetchUserId = async () => {
       setLoadingUser(true);
       const id = await getUserIdFromToken();
-      
+
       if (!id) {
         alert("Unable to identify user. Please log in again.");
         router.push("/login");
         return;
       }
-      
+
       setUserId(id);
       setLoadingUser(false);
     };
@@ -286,23 +266,23 @@ export default function CreateBookingPage() {
         fromDate: selectedDate,
         toDate: selectedDate,
       });
-      
+
       if (!response) {
         console.error("No response from availability API");
         setAvailableSlots([]);
         return;
       }
-      
+
       console.log("Availability API Response:", response.data);
       console.log("Timeslots in store:", timeslots);
       console.log("Target date:", selectedDate);
-      
+
       const parsed = parseAvailabilityResponse(
         response.data,
         selectedDate,
         timeslots
       );
-      
+
       console.log("Parsed slots:", parsed);
       setAvailableSlots(parsed);
     } catch (err: any) {
@@ -378,7 +358,7 @@ export default function CreateBookingPage() {
     }
 
     if (!validate()) return;
-    
+
     setSaving(true);
     try {
       const draftPayload = {
@@ -438,7 +418,6 @@ export default function CreateBookingPage() {
     }
   };
 
-  // Show loading if user ID not loaded yet
   if (loadingUser || !userId) {
     return (
       <Layout>
@@ -458,9 +437,7 @@ export default function CreateBookingPage() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* ── LEFT ── */}
         <div className="lg:col-span-2 space-y-5">
-          {/* Facility & Date selector */}
           <Card>
             <h3 className="text-base font-bold text-rotary-royal mb-4">
               Select Facility &amp; Date
@@ -505,7 +482,6 @@ export default function CreateBookingPage() {
             )}
           </Card>
 
-          {/* Available slots */}
           {selectedFacility && selectedDate && (
             <Card>
               <div className="flex items-center justify-between mb-4">
@@ -548,11 +524,10 @@ export default function CreateBookingPage() {
                     return (
                       <div
                         key={slot.id}
-                        className={`border rounded-lg p-4 transition-all ${
-                          isAdded
+                        className={`border rounded-lg p-4 transition-all ${isAdded
                             ? "border-green-500 bg-green-50"
                             : "border-gray-200 hover:border-rotary-royal hover:shadow-sm"
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
@@ -593,7 +568,6 @@ export default function CreateBookingPage() {
             </Card>
           )}
 
-          {/* Event Details */}
           <Card>
             <h3 className="text-base font-bold text-rotary-royal mb-4">
               Event Details
@@ -627,7 +601,6 @@ export default function CreateBookingPage() {
           </Card>
         </div>
 
-        {/* ── RIGHT: Summary ── */}
         <div className="lg:col-span-1">
           <Card className="sticky top-5">
             <h3 className="text-base font-bold text-rotary-royal mb-4">

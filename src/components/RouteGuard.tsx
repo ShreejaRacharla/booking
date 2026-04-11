@@ -21,21 +21,17 @@ export default function RouteGuard({
   useEffect(() => {
     if (!hydrated) return;
 
-    // Not authenticated - redirect to login
     if (!isAuthenticated || !user) {
       router.replace(redirectTo);
       return;
     }
 
-    // Check role-based access
     if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-      // Redirect based on user role
       const defaultPath = user.role === 'admin' ? '/admin/dashboard' : '/user/dashboard';
       router.replace(defaultPath);
     }
   }, [isAuthenticated, user, hydrated, allowedRoles, router, redirectTo]);
 
-  // Show nothing while checking authentication
   if (!hydrated || !isAuthenticated || !user) {
     return (
       <div className="h-screen w-screen flex items-center justify-center">
@@ -44,7 +40,6 @@ export default function RouteGuard({
     );
   }
 
-  // Check if user has required role
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     return null;
   }
