@@ -7,7 +7,8 @@ import {
   updateFacilityAPI,
   deleteFacilityAPI,
 } from "../../store/slices/facilitySlice";
-import { fetchLocations } from "../../store/slices/locationSlice"; 
+import { fetchLocations } from "../../store/slices/locationSlice";
+import { fetchUsers } from "../../store/slices/userSlice";
 import { Facility, FacilityType, Column } from "../../types";
 import {
   Layout,
@@ -36,39 +37,61 @@ const EMPTY = {
   type: "" as string,
   capacity: "",
   isActive: true,
+  approverId: "",
 };
 
 export default function FacilitiesPage({ embedded = false }: { embedded?: boolean }) {
   const dispatch = useDispatch();
+
+  // Get all data from Redux slices
   const { items: facilities, loading, error } = useSelector(
     (s: RootState) => s.facilities
   );
   const { items: locations, loading: locationsLoading } = useSelector(
     (s: RootState) => s.locations
   );
+  const { items: users, loading: usersLoading, error: usersError } = useSelector(
+    (s: RootState) => s.users
+  );
   const user = useSelector((s: RootState) => s.auth.user);
 
+  // Local state
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Facility | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
+  // Fetch all data on mount
   useEffect(() => {
     dispatch(fetchFacilities() as any);
     dispatch(fetchLocations() as any);
+    dispatch(fetchUsers() as any);
   }, [dispatch]);
 
-  const locName = (id: string) =>
-    locations.find((l) => l.id === id)?.name || id;
+  // Helper functions to get names from IDs
+  const getLocationName = (id: string) => {
+    const location = locations.find((l) => l.id === id);
+    return location?.name || id;
+  };
 
+  const getUserName = (id: string) => {
+    const foundUser = users.find((u) => u.id === id);
+    return foundUser?.name || "Unknown";
+  };
+
+  // Open create modal
   const openCreate = () => {
     setEditing(null);
-    setForm(EMPTY);
+    setForm({
+      ...EMPTY,
+      approverId: user?.id || "",
+    });
     setErrors({});
     setOpen(true);
   };
 
+  // Open edit modal
   const openEdit = (f: Facility) => {
     setEditing(f);
     setForm({
@@ -77,11 +100,13 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
       type: f.type,
       capacity: String(f.capacity),
       isActive: f.isActive,
+      approverId: f.approverUserId || user?.id || "",
     });
     setErrors({});
     setOpen(true);
   };
 
+  // Validate form
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Required";
@@ -89,10 +114,12 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
     if (!form.type) e.type = "Required";
     if (!form.capacity || Number(form.capacity) <= 0)
       e.capacity = "Must be > 0";
+    if (!form.approverId) e.approverId = "Required";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
+  // Save facility
   const save = async () => {
     if (!validate()) return;
     setSaving(true);
@@ -104,7 +131,7 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
             name: form.name,
             capacity: Number(form.capacity),
             locationId: form.locationId,
-            approverUserId: user?.id ?? "",
+            approverUserId: form.approverId,
             type: form.type as FacilityType,
             isActive: form.isActive,
           }) as any
@@ -115,7 +142,7 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
             name: form.name,
             capacity: Number(form.capacity),
             locationId: form.locationId,
-            approverUserId: user?.id ?? "",
+            approverUserId: form.approverId,
             type: form.type as FacilityType,
             isActive: form.isActive,
           }) as any
@@ -130,6 +157,7 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
     }
   };
 
+  // Delete facility
   const handleDelete = async (f: Facility) => {
     if (!confirm(`Are you sure you want to delete "${f.name}"?`)) return;
 
@@ -140,12 +168,13 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
     }
   };
 
+  // Table columns
   const columns: Column[] = [
     { key: "name", label: "Facility" },
     {
       key: "locationId",
       label: "Location",
-      render: (v: string) => locName(v),
+      render: (v: string) => <span>{getLocationName(v)}</span>,
     },
     {
       key: "type",
@@ -154,7 +183,18 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
         <Badge variant="booked">{v.replace("_", " ")}</Badge>
       ),
     },
-    { key: "capacity", label: "Capacity" },
+    {
+      key: "capacity",
+      label: "Capacity",
+      render: (v: number) => <span>{v} people</span>,
+    },
+    {
+      key: "approverUserId",
+      label: "Approver",
+      render: (v: string) => (
+        <span className="text-sm font-medium">{getUserName(v)}</span>
+      ),
+    },
     {
       key: "isActive",
       label: "Status",
@@ -197,15 +237,25 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
       />
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-rotary-cranberry/10 border border-rotary-cranberry/30">
-          <p className="text-sm text-rotary-cranberry">{error}</p>
+        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+      {usersError && (
+        <div className="mb-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+          <p className="text-sm text-yellow-600">⚠️ {usersError}</p>
         </div>
       )}
 
       <Card padding={false}>
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 text-rotary-royal animate-spin" />
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          </div>
+        ) : facilities.length === 0 ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-gray-500">No facilities found</p>
           </div>
         ) : (
           <Table columns={columns} data={facilities} />
@@ -238,7 +288,7 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
               }
               error={errors.locationId}
               disabled={saving || locationsLoading}
-              placeholder={locationsLoading ? "Loading locations..." : "Select location"}
+              placeholder={locationsLoading ? "Loading..." : "Select location"}
             />
             <Select
               label="Type"
@@ -258,6 +308,16 @@ export default function FacilitiesPage({ embedded = false }: { embedded?: boolea
             onChange={(e) => setForm({ ...form, capacity: e.target.value })}
             error={errors.capacity}
             disabled={saving}
+          />
+
+          <Select
+            label="Approver"
+            options={users.map((u) => ({ value: u.id, label: u.name }))}
+            value={form.approverId}
+            onChange={(e) => setForm({ ...form, approverId: e.target.value })}
+            error={errors.approverId}
+            disabled={saving || usersLoading}
+            placeholder={usersLoading ? "Loading users..." : "Select approver"}
           />
 
           <Toggle

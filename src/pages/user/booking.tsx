@@ -22,8 +22,10 @@ import {
   Select,
   Badge,
 } from "../../components";
-import { Loader2, Calendar, Clock, Plus, Trash2, Check } from "lucide-react";
+import { Loader2, Calendar, Clock, Plus, Trash2, Check, Save } from "lucide-react";
 import { BookingItem } from "../../types";
+import Cookies from "js-cookie";
+import axios from "axios";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -38,8 +40,117 @@ interface AvailableSlot {
   status: string;
 }
 
-// Hardcoded test user ID — replace with real auth user ID in production
-const TEST_USER_ID = "ed8d2207-176e-49aa-8905-ec9fc1049ffb";
+interface DecodedToken {
+  id?: string;
+  userId?: string;
+  sub?: string;
+  username?: string;
+  user_id?: string;
+  exp?: number;
+  iat?: number;
+}
+
+// ─── HELPER: MANUAL JWT DECODER ───────────────────────────────────────────────
+
+function decodeJWT(token: string): DecodedToken | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) {
+      console.error("Invalid JWT format");
+      return null;
+    }
+
+    const payload = parts[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error("Error decoding JWT:", error);
+    return null;
+  }
+}
+
+// ─── HELPER: GET USER ID FROM TOKEN & API ─────────────────────────────────────
+
+async function getUserIdFromToken(): Promise<string | null> {
+  try {
+    const token = Cookies.get("accessToken");
+    
+    if (!token) {
+      console.warn("No access token found in cookies");
+      return null;
+    }
+
+    const decoded = decodeJWT(token);
+    
+    if (!decoded) {
+      console.error("Failed to decode token");
+      return null;
+    }
+
+    console.log("🔑 Decoded token:", decoded);
+
+    // Check if token is expired
+    if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+      console.error("Token has expired");
+      return null;
+    }
+
+    // CASE 1: Token already has user ID
+    const directUserId = decoded.id || decoded.userId || decoded.sub || decoded.user_id;
+    
+    if (directUserId) {
+      console.log("User ID found directly in token:", directUserId);
+      return directUserId;
+    }
+
+    // CASE 2: Token has username, fetch user ID from API
+    const username = decoded.username;
+    
+    if (!username) {
+      console.error("No userId or username found in token. Token structure:", decoded);
+      return null;
+    }
+
+    console.log("🔍 Fetching user ID for username:", username);
+
+    // Fetch user details from API
+    const response = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/users/by-username/${username}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const userId = response.data?.id || response.data?.data?.id || response.data?.userId;
+
+    if (!userId) {
+      console.error("No user ID in API response:", response.data);
+      return null;
+    }
+
+    console.log("User ID fetched from API:", userId);
+    return userId;
+
+  } catch (error: any) {
+    console.error("Error extracting user ID:", error);
+    
+    if (error.response?.status === 401) {
+      console.error("Unauthorized - token may be invalid");
+    }
+    
+    return null;
+  }
+}
 
 // ─── AVAILABILITY PARSER ──────────────────────────────────────────────────────
 
@@ -63,6 +174,35 @@ function parseAvailabilityResponse(
   const slots: AvailableSlot[] = [];
 
   list.forEach((entry: any) => {
+    if (entry.slotId && Array.isArray(entry.data)) {
+      entry.data.forEach((day: any) => {
+        let formattedDate: string;
+        
+        if (Array.isArray(day.date)) {
+          const [year, month, dayNum] = day.date;
+          formattedDate = `${year}-${String(month).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
+        } else {
+          formattedDate = day.date;
+        }
+
+        if (formattedDate === targetDate && day.status === "AVAILABLE") {
+          const ts = timeslots.find((t) => t.id === entry.slotId);
+
+          slots.push({
+            id: `${entry.slotId}-${formattedDate}`,
+            date: formattedDate,
+            timeslotId: entry.slotId,
+            timeslotName: entry.slotName || entry.displayName || ts?.name || "Unknown",
+            startTime: ts?.startTime || "00:00:00",
+            endTime: ts?.endTime || "23:59:59",
+            price: day.price ?? 0,
+            status: day.status,
+          });
+        }
+      });
+      return;
+    }
+
     if (entry.date && entry.slotId && !Array.isArray(entry.data)) {
       if (entry.date === targetDate && entry.status === "AVAILABLE") {
         const ts = timeslots.find((t) => t.id === entry.slotId);
@@ -71,31 +211,12 @@ function parseAvailabilityResponse(
           date: entry.date,
           timeslotId: entry.slotId,
           timeslotName: entry.slotName || ts?.name || "Unknown",
-          startTime: entry.startTime || ts?.startTime || "",
-          endTime: entry.endTime || ts?.endTime || "",
+          startTime: entry.startTime || ts?.startTime || "00:00:00",
+          endTime: entry.endTime || ts?.endTime || "23:59:59",
           price: entry.price ?? 0,
           status: entry.status,
         });
       }
-      return;
-    }
-
-    if (entry.slotId && Array.isArray(entry.data)) {
-      entry.data.forEach((day: any) => {
-        if (day.date === targetDate && day.status === "AVAILABLE") {
-          const ts = timeslots.find((t) => t.id === entry.slotId);
-          slots.push({
-            id: `${entry.slotId}-${day.date}`,
-            date: day.date,
-            timeslotId: entry.slotId,
-            timeslotName: entry.slotName || ts?.name || "Unknown",
-            startTime: day.startTime || ts?.startTime || "",
-            endTime: day.endTime || ts?.endTime || "",
-            price: day.price ?? 0,
-            status: day.status,
-          });
-        }
-      });
     }
   });
 
@@ -121,10 +242,34 @@ export default function CreateBookingPage() {
   const [bookingItems, setBookingItems] = useState<BookingItem[]>([]);
   const [eventPurpose, setEventPurpose] = useState("");
   const [expectedAttendees, setExpectedAttendees] = useState("");
-  const [specialRequirements, setSpecialRequirements] = useState("");
+  // const [specialRequirements, setSpecialRequirements] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [draftBookingId, setDraftBookingId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+
+  // Extract user ID from token on mount
+  useEffect(() => {
+    const fetchUserId = async () => {
+      setLoadingUser(true);
+      const id = await getUserIdFromToken();
+      
+      if (!id) {
+        alert("Unable to identify user. Please log in again.");
+        router.push("/login");
+        return;
+      }
+      
+      setUserId(id);
+      setLoadingUser(false);
+    };
+
+    fetchUserId();
+  }, [router]);
 
   useEffect(() => {
     dispatch(fetchFacilities() as any);
@@ -141,12 +286,23 @@ export default function CreateBookingPage() {
         fromDate: selectedDate,
         toDate: selectedDate,
       });
+      
+      if (!response) {
+        console.error("No response from availability API");
+        setAvailableSlots([]);
+        return;
+      }
+      
       console.log("Availability API Response:", response.data);
+      console.log("Timeslots in store:", timeslots);
+      console.log("Target date:", selectedDate);
+      
       const parsed = parseAvailabilityResponse(
         response.data,
         selectedDate,
         timeslots
       );
+      
       console.log("Parsed slots:", parsed);
       setAvailableSlots(parsed);
     } catch (err: any) {
@@ -214,51 +370,85 @@ export default function CreateBookingPage() {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const handleSaveDraft = async () => {
+    if (!userId) {
+      alert("User not authenticated. Please log in again.");
+      router.push("/login");
+      return;
+    }
+
     if (!validate()) return;
+    
     setSaving(true);
     try {
       const draftPayload = {
-        userId: TEST_USER_ID,
+        userId: userId,
         items: bookingItems.map((item) => ({
           facilityId: item.facilityId,
           eventDate: item.eventDate,
           slotId: item.slotId,
           price: item.price,
         })),
-        eventDetails: {
-          purpose: eventPurpose,
-          expectedAttendees: Number(expectedAttendees),
-          ...(specialRequirements.trim() && { specialRequirements }),
-        },
       };
 
-      console.log("📤 Draft payload:", JSON.stringify(draftPayload, null, 2));
+      console.log("Saving draft:", JSON.stringify(draftPayload, null, 2));
 
       const draft = await dispatch(
         createBookingDraftAPI(draftPayload) as any
       ).unwrap();
 
-      console.log("✅ Draft created:", draft);
+      console.log("Draft saved:", draft);
 
       const draftId = draft?.id ?? draft?.data?.id;
       if (!draftId) throw new Error("Draft created but no ID returned");
 
-      console.log("📤 Submitting booking:", draftId);
-      await dispatch(submitBookingAPI(draftId) as any).unwrap();
-
-      console.log("✅ Booking submitted");
-      alert("✅ Booking submitted successfully!");
-      router.push("/user/booking");
+      setDraftBookingId(draftId);
+      alert(`Draft saved successfully! Booking ID: ${draftId}`);
     } catch (err: any) {
-      console.error("❌ Booking error:", err);
+      console.error("Save draft error:", err);
       alert(
-        `Error: ${err?.response?.data?.message || err?.message || "Failed to create booking"}`
+        `Error: ${err?.response?.data?.message || err?.message || "Failed to save draft"}`
       );
     } finally {
       setSaving(false);
     }
   };
+
+  const handleSubmit = async () => {
+    if (!draftBookingId) {
+      alert("Please save draft first");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      console.log("📤 Submitting booking:", draftBookingId);
+      await dispatch(submitBookingAPI(draftBookingId) as any).unwrap();
+
+      console.log("Booking submitted");
+      alert("Booking submitted successfully!");
+      router.push("/user/booking");
+    } catch (err: any) {
+      console.error("Submit error:", err);
+      alert(
+        `Error: ${err?.response?.data?.message || err?.message || "Failed to submit booking"}`
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Show loading if user ID not loaded yet
+  if (loadingUser || !userId) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="w-8 h-8 text-rotary-royal animate-spin" />
+          <span className="ml-3 text-rotary-darkgray">Authenticating...</span>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -383,7 +573,6 @@ export default function CreateBookingPage() {
                           <span className="text-lg font-bold text-rotary-royal">
                             ₹{slot.price.toLocaleString("en-IN")}
                           </span>
-                          {/* ✅ FIX: Use correct variants */}
                           {isAdded ? (
                             <Button size="sm" variant="success" disabled>
                               <Check className="w-3 h-3 mr-1" />
@@ -428,12 +617,12 @@ export default function CreateBookingPage() {
                 min="1"
                 required
               />
-              <Input
+              {/* <Input
                 label="Special Requirements (Optional)"
                 placeholder="e.g. Projector, Audio System"
                 value={specialRequirements}
                 onChange={(e) => setSpecialRequirements(e.target.value)}
-              />
+              /> */}
             </div>
           </Card>
         </div>
@@ -513,20 +702,54 @@ export default function CreateBookingPage() {
               </p>
             )}
 
-            <Button
-              fullWidth
-              onClick={handleSubmit}
-              disabled={saving || bookingItems.length === 0}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting…
-                </>
-              ) : (
-                <>Submit Booking{bookingItems.length > 0 && ` (${bookingItems.length})`}</>
-              )}
-            </Button>
+            {draftBookingId && (
+              <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                {/* <p className="text-green-700 font-medium">Draft Saved</p> */}
+                {/* <p className="text-green-600 mt-1 font-mono break-all">{draftBookingId}</p> */}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Button
+                fullWidth
+                variant="secondary"
+                onClick={handleSaveDraft}
+                disabled={saving || bookingItems.length === 0 || !!draftBookingId}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving Draft…
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    {draftBookingId ? "Draft Saved" : "Save Draft"}
+                  </>
+                )}
+              </Button>
+
+              <Button
+                fullWidth
+                onClick={handleSubmit}
+                disabled={!draftBookingId || submitting}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Submitting…
+                  </>
+                ) : (
+                  <>Submit Booking</>
+                )}
+              </Button>
+            </div>
+
+            {!draftBookingId && (
+              <p className="text-xs text-rotary-darkgray mt-2 text-center">
+                Save draft first, then submit
+              </p>
+            )}
           </Card>
         </div>
       </div>

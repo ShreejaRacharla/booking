@@ -2,15 +2,17 @@ import { ReactNode } from "react";
 
 // ─── BADGE ────────────────────────────────────────────────────────────────────
 export type BadgeVariant =
-  | "default"
-  | "pending"
-  | "active"
-  | "inactive"
   | "available"
+  | "tempHold"
   | "booked"
   | "blocked"
-  | "submitted"
-  | "success";
+  | "active"
+  | "inactive"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "paid"
+  | "conflict";
 
 // ─── ENTITIES ─────────────────────────────────────────────────────────────────
 

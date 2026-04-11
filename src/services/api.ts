@@ -20,13 +20,13 @@ import type {
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 
 export const login = (data: { username: string; password: string }) =>
-  customAxios.post("/auth/login", data);
+  customAxios.post("/login", data);
 
 export const refreshToken = (data: { refreshToken: string }) =>
-  customAxios.post("/auth/refresh", data);
+  customAxios.post("/refresh", data);
 
 export const logout = (data?: { refreshToken?: string }) =>
-  customAxios.post("/auth/logout", data ?? {});
+  customAxios.post("/logout", data ?? {});
 
 // ─── USERS ────────────────────────────────────────────────────────────────────
 
@@ -153,19 +153,16 @@ export const deleteTimeslot = (id: string) =>
 export const createMasterData = (data: MasterDataRequest) =>
   customAxios.post("/v1/master-data", data);
 
-// ─── AVAILABILITY ─────────────────────────────────────────────────────────────
-
-/**
- * GET /api/v1/availability?facilityId=...&fromDate=...&toDate=...
- */
 export const getAvailability = (params?: AvailabilityQueryParams) => {
-  const q = new URLSearchParams();
-  if (params?.locationId) q.append("locationId", params.locationId);
-  if (params?.facilityId) q.append("facilityId", params.facilityId);
-  if (params?.fromDate) q.append("fromDate", params.fromDate);
-  if (params?.toDate) q.append("toDate", params.toDate);
-  const qs = q.toString();
-  return customAxios.get(`/v1/availability${qs ? `?${qs}` : ""}`);
+  if (params?.facilityId && params?.fromDate && params?.toDate) {
+    return customAxios.get(`/v1/availability`, {
+      params: {
+        facilityId: params.facilityId,
+        fromDate: params.fromDate,
+        toDate: params.toDate,
+      },
+    });
+  }
 };
 
 /** GET /api/v1/availability/getAll */

@@ -2,6 +2,7 @@
  * src/store/slices/bookingSlice.ts
  */
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
+import Cookies from "js-cookie";
 import { Booking, BookingStatus } from "../../types";
 import {
   getBookings,
@@ -15,6 +16,7 @@ import {
   rejectBooking,
   generatePaymentLink,
 } from "../../services/api";
+import customAxios from "../../utils/customAxios";
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 
@@ -38,7 +40,52 @@ const initialState: BookingState = {
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-/** Flatten any API response shape into a Booking array */
+/** Get userId (UUID) directly from JWT token — payload.id use karo, sub nahi (sub = username) */
+function getUserIdFromToken(): string | null {
+  try {
+    const token = Cookies.get("accessToken");
+
+    if (!token) {
+      console.warn("⚠️ No accessToken found in cookies");
+      return null;
+    }
+
+    const base64Url = token.split(".")[1];
+    if (!base64Url) {
+      console.error("❌ Invalid token format");
+      return null;
+    }
+
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+
+    const decoded = JSON.parse(jsonPayload);
+    console.log("🔓 Decoded JWT:", decoded);
+
+    // ✅ FIX: payload.id = UUID, payload.sub = username — sub use mat karo
+    const userId = decoded.id || decoded.userId || decoded.user_id || null;
+
+    if (userId) {
+      console.log(`✅ Got userId from token: ${userId}`);
+      return userId;
+    }
+
+    console.error(
+      "❌ No userId field found in token. Available fields:",
+      Object.keys(decoded)
+    );
+    return null;
+  } catch (error) {
+    console.error("❌ Error decoding token:", error);
+    return null;
+  }
+}
+
 function normaliseList(payload: any): Booking[] {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
@@ -48,7 +95,6 @@ function normaliseList(payload: any): Booking[] {
   return [];
 }
 
-/** Flatten a single-booking response (may be wrapped in { data: ... }) */
 function normaliseSingle(payload: any): Booking {
   if (payload?.data && typeof payload.data === "object" && payload.data?.id)
     return payload.data;
@@ -75,9 +121,38 @@ export const fetchMyBookings = createAsyncThunk(
   "bookings/fetchMy",
   async (_, { rejectWithValue }) => {
     try {
-      const res = await getMyBookings();
-      return res.data;
+      const userId = getUserIdFromToken();
+
+      if (!userId) {
+        console.error("❌ Could not get userId from token");
+        return rejectWithValue("Unable to get user ID from token");
+      }
+
+      const res = await getBookings();
+      const allBookings = normaliseList(res.data);
+
+      console.log(`📊 Total bookings fetched: ${allBookings.length}`);
+      console.log(`🔍 Filtering for userId: ${userId}`);
+
+      const userBookings = allBookings.filter(
+        (booking: Booking) => booking.userId === userId
+      );
+
+      console.log(`✅ Found ${userBookings.length} bookings for current user`);
+
+      if (userBookings.length > 0) {
+        console.log("📋 User's bookings summary:");
+        userBookings.slice(0, 5).forEach((b: Booking) => {
+          console.log(`  📌 ${b.bookingCode} | ${b.status} | ₹${b.totalAmount}`);
+        });
+        if (userBookings.length > 5) {
+          console.log(`  ... and ${userBookings.length - 5} more`);
+        }
+      }
+
+      return userBookings;
     } catch (err: any) {
+      console.error("❌ Error in fetchMyBookings:", err);
       return rejectWithValue(
         err?.response?.data?.message || err?.message || "Failed to fetch bookings"
       );
@@ -151,9 +226,7 @@ export const submitBookingAPI = createAsyncThunk(
       return res.data;
     } catch (err: any) {
       return rejectWithValue(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to submit booking"
+        err?.response?.data?.message || err?.message || "Failed to submit booking"
       );
     }
   }
@@ -181,7 +254,7 @@ export const approveBookingAPI = createAsyncThunk(
   ) => {
     try {
       const res = await approveBooking(data.bookingId, data.approverUserId);
-      return res.data;
+      return { ...res.data, _bookingId: data.bookingId };
     } catch (err: any) {
       return rejectWithValue(
         err?.response?.data?.message || err?.message || "Failed to approve"
@@ -208,7 +281,7 @@ export const rejectBookingAPI = createAsyncThunk(
   ) => {
     try {
       const res = await rejectBooking(data);
-      return res.data;
+      return { ...res.data, _bookingId: data.bookingId };
     } catch (err: any) {
       return rejectWithValue(
         err?.response?.data?.message || err?.message || "Failed to reject"
@@ -225,10 +298,30 @@ export const generatePaymentLinkAPI = createAsyncThunk(
       return res.data;
     } catch (err: any) {
       return rejectWithValue(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to generate payment link"
+        err?.response?.data?.message || err?.message || "Failed to generate payment link"
       );
+    }
+  }
+);
+
+export const confirmBookingPayment = createAsyncThunk(
+  "booking/confirmPayment",
+  async (
+    payload: {
+      bookingId: string;
+      razorpay_payment_id: string;
+      razorpay_payment_link_id: string;
+      razorpay_payment_link_reference_id: string;
+      razorpay_payment_link_status: string;
+      razorpay_signature: string;
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      const res = await customAxios.post("/bookings/confirm-payment", payload);
+      return res.data;
+    } catch (err: any) {
+      return rejectWithValue(err?.response?.data?.message ?? "Payment confirmation failed");
     }
   }
 );
@@ -241,6 +334,12 @@ const bookingSlice = createSlice({
   reducers: {
     clearCurrentBooking(state) {
       state.currentBooking = null;
+    },
+    clearMyBookings(state) {
+      state.myBookings = [];
+    },
+    clearError(state) {
+      state.error = null;
     },
     updateBookingStatus(
       state,
@@ -255,7 +354,6 @@ const bookingSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // fetchBookings
     builder
       .addCase(fetchBookings.pending, (state) => {
         state.loading = true;
@@ -270,7 +368,6 @@ const bookingSlice = createSlice({
         state.error = (action.payload as string) || "Failed to fetch bookings";
       });
 
-    // fetchMyBookings
     builder
       .addCase(fetchMyBookings.pending, (state) => {
         state.loading = true;
@@ -278,14 +375,13 @@ const bookingSlice = createSlice({
       })
       .addCase(fetchMyBookings.fulfilled, (state, action) => {
         state.loading = false;
-        state.myBookings = normaliseList(action.payload);
+        state.myBookings = action.payload as Booking[];
       })
       .addCase(fetchMyBookings.rejected, (state, action) => {
         state.loading = false;
         state.error = (action.payload as string) || "Failed to fetch bookings";
       });
 
-    // fetchBookingById
     builder
       .addCase(fetchBookingById.pending, (state) => {
         state.loading = true;
@@ -300,13 +396,10 @@ const bookingSlice = createSlice({
         state.error = (action.payload as string) || "Failed to fetch booking";
       });
 
-    // fetchPendingApprovals
-    builder
-      .addCase(fetchPendingApprovals.fulfilled, (state, action) => {
-        state.pendingApprovals = normaliseList(action.payload);
-      });
+    builder.addCase(fetchPendingApprovals.fulfilled, (state, action) => {
+      state.pendingApprovals = normaliseList(action.payload);
+    });
 
-    // createBookingDraftAPI
     builder
       .addCase(createBookingDraftAPI.pending, (state) => {
         state.loading = true;
@@ -323,7 +416,6 @@ const bookingSlice = createSlice({
         state.error = (action.payload as string) || "Failed to create draft";
       });
 
-    // submitBookingAPI
     builder.addCase(submitBookingAPI.fulfilled, (state, action) => {
       const updated = normaliseSingle(action.payload);
       if (updated?.id) {
@@ -334,7 +426,6 @@ const bookingSlice = createSlice({
       }
     });
 
-    // cancelBookingAPI
     builder.addCase(cancelBookingAPI.fulfilled, (state, action) => {
       const updated = normaliseSingle(action.payload);
       if (updated?.id) {
@@ -345,27 +436,76 @@ const bookingSlice = createSlice({
       }
     });
 
-    // approveBookingAPI
+    // ✅ FIX: approveBookingAPI — state.items aur state.myBookings dono update karo
+    // Backend response mein galat/purana status aa sakta hai, isliye
+    // APPROVED_PENDING_PAYMENT force karo aur _bookingId se match karo
     builder.addCase(approveBookingAPI.fulfilled, (state, action) => {
-      const updated = normaliseSingle(action.payload);
-      if (updated?.id) {
+      const payload = action.payload as any;
+      const bookingId = payload?._bookingId || normaliseSingle(payload)?.id;
+
+      if (bookingId) {
+        // pendingApprovals se remove karo
         state.pendingApprovals = state.pendingApprovals.filter(
-          (b) => b.id !== updated.id
+          (b) => b.id !== bookingId
         );
+
+        // ✅ state.items mein status update karo
+        const itemIdx = state.items.findIndex((b) => b.id === bookingId);
+        if (itemIdx !== -1) {
+          state.items[itemIdx] = {
+            ...state.items[itemIdx],
+            status: "APPROVED_PENDING_PAYMENT",
+          };
+        }
+
+        // ✅ state.myBookings mein bhi update karo
+        const myIdx = state.myBookings.findIndex((b) => b.id === bookingId);
+        if (myIdx !== -1) {
+          state.myBookings[myIdx] = {
+            ...state.myBookings[myIdx],
+            status: "APPROVED_PENDING_PAYMENT",
+          };
+        }
+
+        // ✅ currentBooking bhi update karo
+        if (state.currentBooking !== null && state.currentBooking.id === bookingId) {
+          state.currentBooking.status = "APPROVED_PENDING_PAYMENT";
+        }
       }
     });
 
-    // rejectBookingAPI
+    // ✅ FIX: rejectBookingAPI — state.items bhi update karo
     builder.addCase(rejectBookingAPI.fulfilled, (state, action) => {
-      const updated = normaliseSingle(action.payload);
-      if (updated?.id) {
+      const payload = action.payload as any;
+      const bookingId = payload?._bookingId || normaliseSingle(payload)?.id;
+
+      if (bookingId) {
         state.pendingApprovals = state.pendingApprovals.filter(
-          (b) => b.id !== updated.id
+          (b) => b.id !== bookingId
         );
+
+        const itemIdx = state.items.findIndex((b) => b.id === bookingId);
+        if (itemIdx !== -1) {
+          state.items[itemIdx] = {
+            ...state.items[itemIdx],
+            status: "REJECTED",
+          };
+        }
+
+        const myIdx = state.myBookings.findIndex((b) => b.id === bookingId);
+        if (myIdx !== -1) {
+          state.myBookings[myIdx] = {
+            ...state.myBookings[myIdx],
+            status: "REJECTED",
+          };
+        }
+
+        if (state.currentBooking !== null && state.currentBooking.id === bookingId) {
+          state.currentBooking.status = "REJECTED";
+        }
       }
     });
 
-    // generatePaymentLinkAPI
     builder.addCase(generatePaymentLinkAPI.fulfilled, (state, action) => {
       if (state.currentBooking) {
         const d = action.payload;
@@ -376,5 +516,11 @@ const bookingSlice = createSlice({
   },
 });
 
-export const { clearCurrentBooking, updateBookingStatus } = bookingSlice.actions;
+export const {
+  clearCurrentBooking,
+  clearMyBookings,
+  clearError,
+  updateBookingStatus,
+} = bookingSlice.actions;
+
 export default bookingSlice.reducer;

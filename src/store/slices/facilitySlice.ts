@@ -14,61 +14,93 @@ const initialState: FacilityState = {
   error: null,
 };
 
-// thunks
+// Thunks
 export const fetchFacilities = createAsyncThunk(
   "facilities/fetchAll",
-  async () => {
-    const response = await getFacilities();
-    return response.data;
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await getFacilities();
+      return Array.isArray(response.data)
+        ? response.data
+        : response.data.content ?? response.data.items ?? response.data.data ?? [];
+    } catch (err: any) {
+      return rejectWithValue(err?.message || "Failed to fetch facilities");
+    }
   }
 );
 
 export const createFacilityAPI = createAsyncThunk(
   "facilities/create",
-  async (data: {
-    name: string;
-    capacity: number;
-    locationId: string;
-    approverUserId: string;
-    type: FacilityType;
-    isActive: boolean;
-  }) => {
-    const { type, isActive, ...apiPayload } = data;
-    const response = await createFacility(apiPayload);
-    return {
-      ...response.data,
-      type,
-      isActive,
-    } as Facility;
+  async (
+    data: {
+      name: string;
+      capacity: number;
+      locationId: string;
+      approverUserId: string;
+      type: FacilityType;
+      isActive: boolean;
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await createFacility({
+        name: data.name,
+        capacity: data.capacity,
+        locationId: data.locationId,
+        approverUserId: data.approverUserId,
+      });
+      return {
+        ...response.data,
+        type: data.type,
+        isActive: data.isActive,
+      } as Facility;
+    } catch (err: any) {
+      return rejectWithValue(err?.message || "Failed to create facility");
+    }
   }
 );
 
 export const updateFacilityAPI = createAsyncThunk(
   "facilities/update",
-  async (data: {
-    id: string;
-    name: string;
-    capacity: number;
-    locationId: string;
-    approverUserId: string;
-    type: FacilityType;
-    isActive: boolean;
-  }) => {
-    const { id, type, isActive, ...apiPayload } = data;
-    const response = await updateFacility(id, apiPayload);
-    return {
-      ...response.data,
-      type,
-      isActive,
-    } as Facility;
+  async (
+    data: {
+      id: string;
+      name: string;
+      capacity: number;
+      locationId: string;
+      approverUserId: string;
+      type: FacilityType;
+      isActive: boolean;
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await updateFacility(data.id, {
+        name: data.name,
+        capacity: data.capacity,
+        locationId: data.locationId,
+        approverUserId: data.approverUserId,
+      });
+      return {
+        ...response.data,
+        type: data.type,
+        isActive: data.isActive,
+      } as Facility;
+    } catch (err: any) {
+      return rejectWithValue(err?.message || "Failed to update facility");
+    }
   }
 );
 
 export const deleteFacilityAPI = createAsyncThunk(
   "facilities/delete",
-  async (id: string) => {
-    await deleteFacility(id);
-    return id;
+  async (id: string, { rejectWithValue }) => {
+    try {
+      await deleteFacility(id);
+      return id;
+    } catch (err: any) {
+      return rejectWithValue(err?.message || "Failed to delete facility");
+    }
   }
 );
 
@@ -83,13 +115,11 @@ const facilitySlice = createSlice({
     });
     builder.addCase(fetchFacilities.fulfilled, (state, action) => {
       state.loading = false;
-      state.items = Array.isArray(action.payload)
-        ? action.payload
-        : action.payload.content ?? action.payload.items ?? [];
+      state.items = action.payload;
     });
-    builder.addCase(fetchFacilities.rejected, (state, action) => {
+    builder.addCase(fetchFacilities.rejected, (state, action: any) => {
       state.loading = false;
-      state.error = action.error.message || "Failed to fetch facilities";
+      state.error = action.payload;
     });
 
     builder.addCase(createFacilityAPI.pending, (state) => {
@@ -100,9 +130,9 @@ const facilitySlice = createSlice({
       state.loading = false;
       state.items.push(action.payload);
     });
-    builder.addCase(createFacilityAPI.rejected, (state, action) => {
+    builder.addCase(createFacilityAPI.rejected, (state, action: any) => {
       state.loading = false;
-      state.error = action.error.message || "Failed to create facility";
+      state.error = action.payload;
     });
 
     builder.addCase(updateFacilityAPI.pending, (state) => {
@@ -116,9 +146,9 @@ const facilitySlice = createSlice({
         state.items[idx] = action.payload;
       }
     });
-    builder.addCase(updateFacilityAPI.rejected, (state, action) => {
+    builder.addCase(updateFacilityAPI.rejected, (state, action: any) => {
       state.loading = false;
-      state.error = action.error.message || "Failed to update facility";
+      state.error = action.payload;
     });
 
     builder.addCase(deleteFacilityAPI.pending, (state) => {
@@ -129,9 +159,9 @@ const facilitySlice = createSlice({
       state.loading = false;
       state.items = state.items.filter((f) => f.id !== action.payload);
     });
-    builder.addCase(deleteFacilityAPI.rejected, (state, action) => {
+    builder.addCase(deleteFacilityAPI.rejected, (state, action: any) => {
       state.loading = false;
-      state.error = action.error.message || "Failed to delete facility";
+      state.error = action.payload;
     });
   },
 });

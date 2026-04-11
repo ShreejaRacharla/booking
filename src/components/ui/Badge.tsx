@@ -1,17 +1,17 @@
 import React from "react";
-
-type BadgeVariant =
-  | "available"
-  | "tempHold"
-  | "booked"
-  | "blocked"
-  | "active"
-  | "inactive"
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "paid"
-  | "conflict";
+import {BadgeVariant} from "../../types";
+// type BadgeVariant =
+//   | "available"
+//   | "tempHold"
+//   | "booked"
+//   | "blocked"
+//   | "active"
+//   | "inactive"
+//   | "pending"
+//   | "approved"
+//   | "rejected"
+//   | "paid"
+//   | "conflict";
 
 interface BadgeProps {
   variant: BadgeVariant;

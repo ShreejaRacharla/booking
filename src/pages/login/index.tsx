@@ -33,17 +33,19 @@ export default function LoginPage() {
 
   const dispatch = useDispatch();
   const router = useRouter();
-  const { isAuthenticated, hydrated } = useSelector((s: RootState) => s.auth);
+  const { isAuthenticated, hydrated, user } = useSelector((s: RootState) => s.auth);
 
   useEffect(() => {
     dispatch(hydrate());
   }, [dispatch]);
 
   useEffect(() => {
-    if (hydrated && isAuthenticated) {
-      router.replace("/");
+    if (hydrated && isAuthenticated && user) {
+      // Redirect based on role
+      const redirectPath = user.role === "admin" ? "/admin/dashboard" : "/user/dashboard";
+      router.replace(redirectPath);
     }
-  }, [hydrated, isAuthenticated, router]);
+  }, [hydrated, isAuthenticated, user, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,9 +66,6 @@ export default function LoginPage() {
 
       console.log("Login response:", response.data);
 
-          router.push('/admin/dashboard') 
-
-
       const { token, sessionId, refreshToken } = response.data;
 
       if (!token) {
@@ -80,23 +79,27 @@ export default function LoginPage() {
         throw new Error("Invalid token format");
       }
 
+      // Determine user role from token
       let userRole: UserRole = "member";
       if (decoded.roles && Array.isArray(decoded.roles)) {
         const roleString = decoded.roles[0]?.toLowerCase();
         if (roleString === "admin") {
           userRole = "admin";
+        } else if (roleString === "member") {
+          userRole = "member";
         }
       }
 
       const user: User = {
         id: decoded.sub,
         username: decoded.sub,
-        name: decoded.sub.charAt(0).toUpperCase() + decoded.sub.slice(1),
-        email: `${decoded.sub}@rotaryclub.com`,
+        name: decoded.name || decoded.sub.charAt(0).toUpperCase() + decoded.sub.slice(1),
+        email: decoded.email || `${decoded.sub}@rotaryclub.com`,
         role: userRole,
         system: false,
       };
 
+      // Dispatch login action
       dispatch(
         login({
           ...user,
@@ -106,10 +109,13 @@ export default function LoginPage() {
         })
       );
 
-      console.log("Login successful, redirecting to dashboard...");
+      console.log("Login successful, redirecting based on role...");
 
+      // Role-based redirection
+      const redirectPath = userRole === "admin" ? "/admin/dashboard" : "/user/dashboard";
+      
       setTimeout(() => {
-        router.push("/");
+        router.push(redirectPath);
       }, 100);
     } catch (err: any) {
       console.error("Login failed:", err);

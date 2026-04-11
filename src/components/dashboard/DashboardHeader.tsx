@@ -1,4 +1,3 @@
-'use client'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { logout } from '../../services/api'
@@ -29,10 +28,8 @@ export default function DashboardHeader() {
 
   return (
     <>
-      {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/80 backdrop-blur-xl mb-6">
         <div className="max-w-[1600px] mx-auto px-4 md:px-6 lg:px-8 h-16 flex items-center justify-between">
-          {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#01B4E7] to-[#005DAA] flex items-center justify-center shadow-lg shadow-[#01B4E7]/30 group-hover:shadow-[#01B4E7]/50 transition-all">
               <span className="text-white font-bold text-lg leading-none">R</span>
@@ -45,7 +42,6 @@ export default function DashboardHeader() {
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-1 text-sm font-medium">
             {NAV_LINKS.map(({ label, href, icon: Icon }) => {
               const isActive = pathname === href || pathname?.startsWith(href + '/')
@@ -53,11 +49,10 @@ export default function DashboardHeader() {
                 <Link
                   key={href}
                   href={href}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                    isActive
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${isActive
                       ? 'bg-[#01B4E7]/10 text-[#01B4E7] font-semibold'
                       : 'text-foreground/70 hover:text-foreground hover:bg-white/5'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   {label}
@@ -66,7 +61,6 @@ export default function DashboardHeader() {
             })}
           </nav>
 
-          {/* Actions */}
           <div className="flex items-center gap-2">
             <button
               onClick={handleLogout}
@@ -77,7 +71,6 @@ export default function DashboardHeader() {
               {isLoggingOut ? 'Signing out…' : 'Sign out'}
             </button>
 
-            {/* Mobile Menu Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="lg:hidden p-2 rounded-lg hover:bg-white/5 text-foreground/80"
@@ -87,7 +80,6 @@ export default function DashboardHeader() {
           </div>
         </div>
 
-        {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="lg:hidden border-t border-border/50 bg-background/95 backdrop-blur-xl">
             <nav className="px-4 py-3 space-y-1">
@@ -98,11 +90,10 @@ export default function DashboardHeader() {
                     key={href}
                     href={href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                      isActive
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive
                         ? 'bg-[#01B4E7]/10 text-[#01B4E7]'
                         : 'text-foreground/70 hover:bg-white/5'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-4 h-4" />
                     {label}
@@ -122,7 +113,7 @@ export default function DashboardHeader() {
         )}
       </header>
 
-      {/* Page Title */}
+      {/* Page  */}
       <div className="mb-6 px-4 md:px-6 lg:px-8">
         <h1 className="text-3xl font-extrabold tracking-tight text-[#CB4335] uppercase tracking-widest">
           Dashboard Overview

@@ -23,12 +23,7 @@ const customAxios = axios.create({
   withCredentials: true,
 });
 
-const SKIP_IDEMPOTENCY_ENDPOINTS = [
-  "/login",
-  "/register",
-  "/refresh",
-  "/logout",
-];
+// REMOVED: SKIP_IDEMPOTENCY_ENDPOINTS - Now sending for all endpoints
 
 const generateIdempotencyKey = (): string => {
   return uuidv4();
@@ -43,32 +38,24 @@ customAxios.interceptors.request.use(
     const fullUrl = `${config.baseURL}${config.url}`;
     console.log(`[${config.method?.toUpperCase()}] ${fullUrl}`);
 
-    const isPublicEndpoint = SKIP_IDEMPOTENCY_ENDPOINTS.some((endpoint) =>
-      config.url?.includes(endpoint)
-    );
-
-    if (!isPublicEndpoint && typeof window !== "undefined") {
+    // ✅ Add Bearer token if available (for authenticated endpoints)
+    if (typeof window !== "undefined") {
       const accessToken = Cookies.get("accessToken");
       if (accessToken) {
         config.headers.Authorization = `Bearer ${accessToken}`;
-        console.log("Authorization token added");
-      } else {
-        console.warn("No access token found");
+        console.log("✅ Authorization token added");
       }
     }
 
-    if (!isPublicEndpoint) {
-      const idempotencyKey = generateIdempotencyKey();
-      config.headers["Idempotency-Key"] = idempotencyKey;
-      console.log(`Idempotency-Key: ${idempotencyKey}`);
-    } else {
-      console.log("Skipping idempotency for public endpoint");
-    }
+    // ✅ Add Idempotency-Key to ALL requests (including login, register, etc)
+    const idempotencyKey = generateIdempotencyKey();
+    config.headers["Idempotency-Key"] = idempotencyKey;
+    console.log(`🔑 Idempotency-Key: ${idempotencyKey}`);
 
     return config;
   },
   (error) => {
-    console.error("Request Error:", error);
+    console.error("❌ Request Error:", error);
     return Promise.reject(error);
   }
 );
@@ -80,7 +67,7 @@ customAxios.interceptors.request.use(
 customAxios.interceptors.response.use(
   (response) => {
     console.log(
-      `[${response.status}] ${response.config.method?.toUpperCase()} ${
+      `✅ [${response.status}] ${response.config.method?.toUpperCase()} ${
         response.config.url
       }`
     );
@@ -102,12 +89,15 @@ customAxios.interceptors.response.use(
       data: error.response?.data,
     };
 
-    console.error("API Error:", errorDetails);
+    console.error("❌ API Error:", errorDetails);
 
+    // Handle Network Errors
     if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
-      console.error(`NETWORK ERROR`);
+      console.error("🌐 NETWORK ERROR - Check your connection");
+      return Promise.reject(error);
     }
 
+    // Handle 401 Unauthorized with Token Refresh
     if (
       error.response?.status === 401 &&
       !originalRequest._retry &&
@@ -124,7 +114,7 @@ customAxios.interceptors.response.use(
 
         console.log("🔄 Attempting to refresh access token...");
 
-        const response = await axios.post(`${API_BASE_URL}/refresh`, {
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
           refreshToken,
         });
 
@@ -139,6 +129,7 @@ customAxios.interceptors.response.use(
 
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
 
+        // ✅ Generate new Idempotency-Key for retry
         const newIdempotencyKey = generateIdempotencyKey();
         originalRequest.headers["Idempotency-Key"] = newIdempotencyKey;
         console.log(`🔑 New Idempotency-Key for retry: ${newIdempotencyKey}`);
@@ -151,13 +142,24 @@ customAxios.interceptors.response.use(
 
         console.log("🔒 Clearing auth data and redirecting to login...");
 
-        ["accessToken", "refreshToken", "sessionId", "user"].forEach((name) => {
+        // Clear all auth cookies
+        const authCookies = [
+          "accessToken",
+          "refreshToken",
+          "sessionId",
+          "user",
+          "auth",
+          "token",
+          "jwt",
+        ];
+
+        authCookies.forEach((name) => {
           Cookies.remove(name, { path: "/" });
           Cookies.remove(name);
           document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
         });
 
-        if (window.location.pathname !== "/login") {
+        if (typeof window !== "undefined" && window.location.pathname !== "/login") {
           window.location.href = "/login";
         }
 
@@ -165,16 +167,24 @@ customAxios.interceptors.response.use(
       }
     }
 
+    // Handle 403 Forbidden
     if (error.response?.status === 403) {
       console.error("🚫 Access Forbidden - You don't have permission");
     }
 
+    // Handle 404 Not Found
     if (error.response?.status === 404) {
       console.error("🔍 Resource Not Found");
     }
 
+    // Handle 500 Server Error
     if (error.response?.status === 500) {
       console.error("💥 Internal Server Error");
+    }
+
+    // Handle 428 Precondition Required (missing Idempotency-Key)
+    if (error.response?.status === 428) {
+      console.error("⚠️ Precondition Required - Idempotency-Key is required");
     }
 
     return Promise.reject(error);

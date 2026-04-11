@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../store";
 import {
@@ -22,13 +22,8 @@ import {
 } from "../../components";
 import { Loader2, Calendar, Clock, MapPin, Users, CheckCircle, XCircle } from "lucide-react";
 
-// ✅ HARDCODED ADMIN USER ID - Replace with proper auth later
-const ADMIN_USER_ID = "e3af12c2-de09-47d1-9d0e-b25a214274f7";
-
-// ✅ Define filter categories that map to actual backend statuses
 type FilterType = "ALL" | "PENDING" | "APPROVED" | "REJECTED" | "PAID" | "CANCELLED";
 
-// ✅ Map filter categories to actual backend statuses
 const filterStatusMap: Record<FilterType, BookingStatus[]> = {
   ALL: [],
   PENDING: ["PENDING", "PENDING_APPROVAL", "SUBMITTED", "DRAFT"],
@@ -38,6 +33,59 @@ const filterStatusMap: Record<FilterType, BookingStatus[]> = {
   CANCELLED: ["CANCELLED"],
 };
 
+// ✅ Cookie "accessToken" se JWT decode karke UUID (payload.id) nikalta hai
+function getUserIdFromToken(): string | null {
+  try {
+    // "accessToken" cookie dhundo
+    const cookies = document.cookie.split(";");
+    let token: string | null = null;
+
+    for (const cookie of cookies) {
+      const parts = cookie.trim().split("=");
+      const name = parts[0];
+      const value = parts.slice(1).join("="); // value mein "=" ho sakta hai
+      if (name === "accessToken") {
+        token = decodeURIComponent(value);
+        break;
+      }
+    }
+
+    if (!token) {
+      console.error("❌ accessToken cookie nahi mili");
+      return null;
+    }
+
+    // JWT: header.payload.signature — sirf payload chahiye (index 1)
+    const payloadBase64 = token.split(".")[1];
+    if (!payloadBase64) {
+      console.error("❌ Invalid JWT format");
+      return null;
+    }
+
+    // Base64url → Base64 → JSON string
+    const base64 = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonStr = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("")
+    );
+
+    const payload = JSON.parse(jsonStr);
+
+    // payload.id = UUID (e.g. "e3af12c2-de09-47d1-9d0e-b25a214274f7")
+    // payload.sub = username (e.g. "rufin") — ye UUID nahi hai, use mat karo
+    const userId = payload.id || null;
+
+    console.log("🔑 JWT payload.id (UUID):", userId);
+
+    return userId ? String(userId) : null;
+  } catch (err) {
+    console.error("❌ JWT decode failed:", err);
+    return null;
+  }
+}
+
 export default function ApprovalsPage({ embedded = false }: { embedded?: boolean }) {
   const dispatch = useDispatch();
   const { items: bookings, loading, error } = useSelector(
@@ -45,7 +93,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
   );
   const locations = useSelector((s: RootState) => s.locations.items);
   const facilities = useSelector((s: RootState) => s.facilities.items);
-  const user = useSelector((s: RootState) => s.auth.user);
 
   const [detail, setDetail] = useState<Booking | null>(null);
   const [altOpen, setAltOpen] = useState(false);
@@ -53,18 +100,34 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
   const [filter, setFilter] = useState<FilterType>("ALL");
   const [actionLoading, setActionLoading] = useState(false);
 
+  // ✅ Decode approverUserId from JWT token (not from Redux state)
+  const approverUserId = useMemo(() => getUserIdFromToken(), []);
+
   useEffect(() => {
     dispatch(fetchBookings() as any);
     dispatch(fetchLocations() as any);
     dispatch(fetchFacilities() as any);
   }, [dispatch]);
 
+  if (!approverUserId) {
+    return (
+      <Layout>
+        <Card>
+          <div className="p-6 text-center">
+            <p className="text-rotary-cranberry">
+              User not authenticated or token missing. Please login again.
+            </p>
+          </div>
+        </Card>
+      </Layout>
+    );
+  }
+
   const locName = (id: string) =>
     locations.find((l) => l.id === id)?.name || id;
   const facName = (id: string) =>
     facilities.find((f) => f.id === id)?.name || id;
 
-  // ✅ Fixed badge variant mapping with ALL backend status types
   const badgeVariant = (
     s: BookingStatus
   ): "pending" | "active" | "inactive" | "available" | "booked" | "blocked" => {
@@ -83,7 +146,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
     return map[s] || "pending";
   };
 
-  // ✅ Get display label for status
   const getStatusLabel = (s: BookingStatus): string => {
     const labels: Record<BookingStatus, string> = {
       DRAFT: "Draft",
@@ -100,86 +162,91 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
     return labels[s] || s;
   };
 
-  // ✅ Check if booking needs approval action
   const needsApproval = (status: BookingStatus): boolean => {
     return ["PENDING", "PENDING_APPROVAL", "SUBMITTED"].includes(status);
   };
 
-  // ✅ Helper function to get approved action time
   const getApprovedActionTime = (approvals?: BookingApproval[]): string | null => {
     if (!approvals) return null;
     const approvedEntry = approvals.find((a) => a.status === "APPROVED");
     return approvedEntry?.actionTime || null;
   };
 
-  // ✅ Filter bookings based on selected filter
-  const filtered = filter === "ALL" 
-    ? bookings 
+  const filtered = filter === "ALL"
+    ? bookings
     : bookings.filter((b) => filterStatusMap[filter].includes(b.status));
 
-  // ✅ Get count for each filter
   const getFilterCount = (filterType: FilterType): number => {
     if (filterType === "ALL") return bookings.length;
     return bookings.filter((b) => filterStatusMap[filterType].includes(b.status)).length;
   };
 
-  // ✅ FIX: Use hardcoded admin ID
+  // ✅ approverUserId ab JWT se aata hai — UUID hoga, username nahi
   const handleApprove = async (booking: Booking) => {
-    // ✅ Use hardcoded admin ID directly
-    const approverUserId = ADMIN_USER_ID;
-    
-    console.log("🔐 Approving with userId:", approverUserId);
+    console.log("🔐 Approving booking:", booking.id, "with approverUserId (from JWT):", approverUserId);
 
     setActionLoading(true);
     try {
-      await dispatch(
+      const result = await dispatch(
         approveBookingAPI({
           bookingId: booking.id,
-          approverUserId: approverUserId,
+          approverUserId: approverUserId,  // ✅ JWT se decoded UUID
         }) as any
       ).unwrap();
 
+      console.log("✅ Approval response:", result);
+
+      dispatch(updateBookingStatus({
+        id: booking.id,
+        status: result?.status || "APPROVED_PENDING_PAYMENT"
+      }));
+
       alert("✅ Booking approved successfully!");
       setDetail(null);
-      dispatch(fetchBookings() as any);
+
+      await dispatch(fetchBookings() as any);
     } catch (err: any) {
-      console.error(err);
-      alert(err?.message || "Failed to approve booking");
+      console.error("❌ Approval error:", err);
+      alert(err?.message || err?.error || "Failed to approve booking");
     } finally {
       setActionLoading(false);
     }
   };
 
-  // ✅ FIX: Use hardcoded admin ID
   const handleReject = async (booking: Booking) => {
     if (!rejectReason.trim()) {
       alert("Please provide a rejection reason");
       return;
     }
 
-    // ✅ Use hardcoded admin ID directly
-    const approverUserId = ADMIN_USER_ID;
-    
-    console.log("🔐 Rejecting with userId:", approverUserId);
+    console.log("🔐 Rejecting booking:", booking.id, "with approverUserId (from JWT):", approverUserId);
 
     setActionLoading(true);
     try {
-      await dispatch(
+      const result = await dispatch(
         rejectBookingAPI({
           bookingId: booking.id,
-          approverUserId: approverUserId,
+          approverUserId: approverUserId,  // ✅ JWT se decoded UUID
           reason: rejectReason,
         }) as any
       ).unwrap();
+
+      console.log("✅ Rejection response:", result);
+
+      dispatch(updateBookingStatus({
+        id: booking.id,
+        status: "REJECTED"
+      }));
 
       alert("✅ Booking rejected");
       setDetail(null);
       setRejectReason("");
       setAltOpen(false);
-      dispatch(fetchBookings() as any);
+
+      await dispatch(fetchBookings() as any);
     } catch (err: any) {
-      console.error(err);
-      alert(err?.message || "Failed to reject booking");
+      console.error("❌ Rejection error:", err);
+      alert(err?.message || err?.error || "Failed to reject booking");
     } finally {
       setActionLoading(false);
     }
@@ -260,7 +327,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
     },
   ];
 
-  // ✅ Filter buttons configuration
   const filterButtons: { key: FilterType; label: string }[] = [
     { key: "ALL", label: "All" },
     { key: "PENDING", label: "Pending" },
@@ -270,7 +336,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
     { key: "CANCELLED", label: "Cancelled" },
   ];
 
-  // ✅ Get approval time for display
   const approvedTime = detail ? getApprovedActionTime(detail.approvals) : null;
 
   const content = (
@@ -281,11 +346,10 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
           <button
             key={key}
             onClick={() => setFilter(key)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              filter === key
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${filter === key
                 ? "bg-rotary-royal text-white"
                 : "bg-white text-rotary-darkgray border border-gray-200 hover:border-rotary-royal"
-            }`}
+              }`}
           >
             {label}
             <span className="ml-1 opacity-60">
@@ -324,7 +388,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
       >
         {detail && (
           <div className="space-y-5">
-            {/* Booking Info */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-xs text-rotary-darkgray">Booking Code</p>
@@ -360,7 +423,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
               </div>
             </div>
 
-            {/* Approval Info */}
             {detail.approvals && detail.approvals.length > 0 && (
               <div className="border-t border-gray-100 pt-4">
                 <h4 className="text-sm font-bold text-rotary-royal mb-3">
@@ -370,13 +432,12 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
                   {detail.approvals.map((approval, idx) => (
                     <div
                       key={approval.id || idx}
-                      className={`p-3 rounded-lg ${
-                        approval.status === "APPROVED"
+                      className={`p-3 rounded-lg ${approval.status === "APPROVED"
                           ? "bg-green-50 border border-green-200"
                           : approval.status === "REJECTED"
-                          ? "bg-red-50 border border-red-200"
-                          : "bg-yellow-50 border border-yellow-200"
-                      }`}
+                            ? "bg-red-50 border border-red-200"
+                            : "bg-yellow-50 border border-yellow-200"
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">
@@ -387,8 +448,8 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
                             approval.status === "APPROVED"
                               ? "active"
                               : approval.status === "REJECTED"
-                              ? "inactive"
-                              : "pending"
+                                ? "inactive"
+                                : "pending"
                           }
                         >
                           {approval.status}
@@ -410,7 +471,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
               </div>
             )}
 
-            {/* Event Details */}
             {detail.eventDetails && (
               <div className="border-t border-gray-100 pt-4">
                 <h4 className="text-sm font-bold text-rotary-royal mb-3">
@@ -444,7 +504,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
               </div>
             )}
 
-            {/* Booked Slots */}
             <div className="border-t border-gray-100 pt-4">
               <p className="text-sm font-bold text-rotary-royal mb-3">
                 Booked Slots ({detail.items?.length || 0})
@@ -488,7 +547,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
               </div>
             </div>
 
-            {/* Action Buttons - Only show for pending bookings */}
             {needsApproval(detail.status) && (
               <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-gray-100">
                 <Button
@@ -521,7 +579,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
               </div>
             )}
 
-            {/* Status Messages */}
             {["APPROVED", "APPROVED_PENDING_PAYMENT", "CONFIRMED_FULL"].includes(detail.status) && (
               <div className="p-3 rounded-lg bg-green-50 border border-green-200">
                 <p className="text-sm text-green-800">

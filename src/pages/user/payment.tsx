@@ -1,221 +1,294 @@
+// src/pages/user/payment.tsx  (or wherever your router maps /payment/payment-success)
+// This page is reached after Razorpay redirects back to your frontend.
+//
+// URL shape:
+//   /fe/payment/payment-success
+//     ?bookingId=<uuid>
+//     &razorpay_payment_id=pay_xxx
+//     &razorpay_payment_link_id=plink_xxx
+//     &razorpay_payment_link_reference_id=<uuid>
+//     &razorpay_payment_link_status=paid | cancelled
+//     &razorpay_signature=<hmac-sha256>
+
 import { useEffect, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { RootState } from "../../store";
-import {
-  fetchFlaggedPayments,
-  verifyPaymentAPI,
-} from "../../store/slices/paymentSlice";
-import { Column } from "../../types";
-import {
-  Layout,
-  PageHeader,
-  Card,
-  Table,
-  Button,
-  Badge,
-  Modal,
-  Input,
-  Select,
-} from "../../components";
-import {
-  Loader2,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Eye,
-} from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "@/store";
+import { confirmBookingPayment } from "@/store/slices/bookingSlice"; // ← add this thunk (see below)
 
-export default function PaymentReviewPage() {
-  const dispatch = useDispatch();
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-  const { flaggedPayments, loading } = useSelector(
-    (s: RootState) => s.payments
-  );
+interface PaymentSuccessState {
+  status: "loading" | "success" | "failed" | "cancelled";
+  bookingId: string | null;
+  paymentId: string | null;
+  errorMessage?: string;
+}
 
-  const [selectedPayment, setSelectedPayment] = useState<any>(null);
-  const [verificationStatus, setVerificationStatus] = useState<
-    "verified" | "flagged" | "rejected"
-  >("verified");
-  const [notes, setNotes] = useState("");
-  const [verifying, setVerifying] = useState(false);
+// ─── Component ────────────────────────────────────────────────────────────────
+
+const PaymentSuccessPage = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
+
+  const [state, setState] = useState<PaymentSuccessState>({
+    status: "loading",
+    bookingId: null,
+    paymentId: null,
+  });
 
   useEffect(() => {
-    dispatch(fetchFlaggedPayments() as any);
-  }, [dispatch]);
+    // 1. Read every query param Razorpay sends back
+    const bookingId = searchParams.get("bookingId");
+    const razorpay_payment_id = searchParams.get("razorpay_payment_id");
+    const razorpay_payment_link_id = searchParams.get("razorpay_payment_link_id");
+    const razorpay_payment_link_reference_id = searchParams.get(
+      "razorpay_payment_link_reference_id"
+    );
+    const razorpay_payment_link_status = searchParams.get(
+      "razorpay_payment_link_status"
+    );
+    const razorpay_signature = searchParams.get("razorpay_signature");
 
-  const handleVerify = async () => {
-    if (!selectedPayment) return;
-
-    setVerifying(true);
-    try {
-      await dispatch(
-        verifyPaymentAPI({
-          bookingId: selectedPayment.bookingId,
-          paymentId: selectedPayment.paymentId,
-          status: verificationStatus,
-          notes: notes || undefined,
-        }) as any
-      ).unwrap();
-
-      alert("✅ Payment verification completed!");
-      setSelectedPayment(null);
-      setNotes("");
-      dispatch(fetchFlaggedPayments() as any);
-    } catch (err: any) {
-      alert(err?.message || "Failed to verify payment");
-    } finally {
-      setVerifying(false);
+    // 2. Guard: if status is not "paid", show cancelled/failed UI
+    if (razorpay_payment_link_status !== "paid") {
+      setState({
+        status: "cancelled",
+        bookingId,
+        paymentId: razorpay_payment_id,
+      });
+      return;
     }
-  };
 
-  const columns: Column[] = [
-    {
-      key: "bookingId",
-      label: "Booking ID",
-      render: (v: string) => (
-        <span className="font-mono text-xs">{v.slice(0, 8)}</span>
-      ),
-    },
-    {
-      key: "paymentId",
-      label: "Payment ID",
-      render: (v: string) => (
-        <span className="font-mono text-xs">{v || "N/A"}</span>
-      ),
-    },
-    {
-      key: "amount",
-      label: "Amount",
-      render: (v: number) => (
-        <span className="font-bold text-rotary-royal">₹{v}</span>
-      ),
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (v: string) => <Badge variant="pending">{v}</Badge>,
-    },
-    {
-      key: "createdAt",
-      label: "Date",
-      render: (v: string) => (
-        <span className="text-sm text-rotary-darkgray">
-          {new Date(v).toLocaleDateString()}
-        </span>
-      ),
-    },
-    {
-      key: "actions",
-      label: "Actions",
-      render: (_: any, row: any) => (
-        <Button
-          size="sm"
-          onClick={() => setSelectedPayment(row)}
-        >
-          <Eye className="w-3 h-3 mr-1" />
-          Review
-        </Button>
-      ),
-    },
-  ];
+    // 3. Call your backend to verify signature + confirm booking
+    if (bookingId && razorpay_payment_id && razorpay_signature) {
+      dispatch(
+        confirmBookingPayment({
+          bookingId,
+          razorpay_payment_id,
+          razorpay_payment_link_id: razorpay_payment_link_id ?? "",
+          razorpay_payment_link_reference_id:
+            razorpay_payment_link_reference_id ?? "",
+          razorpay_payment_link_status: razorpay_payment_link_status ?? "",
+          razorpay_signature,
+        })
+      )
+        .unwrap()
+        .then(() => {
+          setState({
+            status: "success",
+            bookingId,
+            paymentId: razorpay_payment_id,
+          });
+        })
+        .catch((err: unknown) => {
+          setState({
+            status: "failed",
+            bookingId,
+            paymentId: razorpay_payment_id,
+            errorMessage:
+              typeof err === "string" ? err : "Payment verification failed.",
+          });
+        });
+    } else {
+      setState({
+        status: "failed",
+        bookingId: null,
+        paymentId: null,
+        errorMessage: "Missing payment parameters.",
+      });
+    }
+  }, [searchParams, dispatch]);
 
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (state.status === "loading") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-gray-600 text-sm">Verifying your payment…</p>
+      </div>
+    );
+  }
+
+  if (state.status === "success") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen px-4">
+        <div className="bg-white rounded-2xl shadow-md p-8 max-w-md w-full text-center">
+          {/* Success icon */}
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-8 h-8 text-green-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+            Payment Successful!
+          </h1>
+          <p className="text-gray-500 text-sm mb-6">
+            Your booking has been confirmed.
+          </p>
+
+          {/* Booking details */}
+          <div className="bg-gray-50 rounded-xl p-4 text-left mb-6 space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Booking ID</span>
+              <span className="font-mono text-gray-700 text-xs break-all max-w-[60%] text-right">
+                {state.bookingId}
+              </span>
+            </div>
+            <div className="border-t border-gray-200" />
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Payment ID</span>
+              <span className="font-mono text-gray-700 text-xs break-all max-w-[60%] text-right">
+                {state.paymentId}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => navigate(`/user/booking-detail`)}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium hover:bg-blue-700 transition"
+            >
+              View Booking
+            </button>
+            <button
+              onClick={() => navigate("/user/booking")}
+              className="w-full border border-gray-300 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-50 transition"
+            >
+              My Bookings
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.status === "cancelled") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen px-4">
+        <div className="bg-white rounded-2xl shadow-md p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-8 h-8 text-yellow-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01M12 4a8 8 0 100 16 8 8 0 000-16z"
+              />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+            Payment Cancelled
+          </h1>
+          <p className="text-gray-500 text-sm mb-6">
+            Your payment was not completed. Your booking is still pending.
+          </p>
+          <button
+            onClick={() => navigate(-1)}
+            className="w-full bg-gray-800 text-white py-3 rounded-xl font-medium hover:bg-gray-700 transition"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // status === "failed"
   return (
-    <Layout>
-      <PageHeader
-        title="Payment Review"
-        subtitle="Review and verify flagged payments"
-      />
-
-      <Card padding={false}>
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 text-rotary-royal animate-spin" />
-          </div>
-        ) : flaggedPayments.length === 0 ? (
-          <div className="text-center py-12">
-            <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-            <p className="text-rotary-darkgray">No flagged payments</p>
-          </div>
-        ) : (
-          <Table columns={columns} data={flaggedPayments} />
-        )}
-      </Card>
-
-      {/* Review Modal */}
-      <Modal
-        isOpen={selectedPayment !== null}
-        onClose={() => !verifying && setSelectedPayment(null)}
-        title="Review Payment"
-        size="md"
-      >
-        {selectedPayment && (
-          <div className="space-y-4">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <div className="font-medium text-yellow-900 mb-2">
-                    Flagged Payment
-                  </div>
-                  <div className="text-sm text-yellow-800 space-y-1">
-                    <div>Booking ID: {selectedPayment.bookingId}</div>
-                    <div>Payment ID: {selectedPayment.paymentId || "N/A"}</div>
-                    <div className="font-bold">
-                      Amount: ₹{selectedPayment.amount}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Select
-              label="Verification Status"
-              options={[
-                { value: "verified", label: "Verified - Approve Payment" },
-                { value: "flagged", label: "Keep Flagged - Need More Info" },
-                { value: "rejected", label: "Rejected - Invalid Payment" },
-              ]}
-              value={verificationStatus}
-              onChange={(e) =>
-                setVerificationStatus(
-                  e.target.value as "verified" | "flagged" | "rejected"
-                )
-              }
+    <div className="flex flex-col items-center justify-center min-h-screen px-4">
+      <div className="bg-white rounded-2xl shadow-md p-8 max-w-md w-full text-center">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg
+            className="w-8 h-8 text-red-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
             />
-
-            <Input
-              label="Notes (Optional)"
-              placeholder="Add verification notes..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-
-            <div className="flex gap-3 pt-4 border-t border-gray-100">
-              <Button fullWidth onClick={handleVerify} disabled={verifying}>
-                {verifying ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Submit Verification
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                fullWidth
-                onClick={() => setSelectedPayment(null)}
-                disabled={verifying}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-    </Layout>
+          </svg>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-800 mb-2">
+          Verification Failed
+        </h1>
+        <p className="text-gray-500 text-sm mb-2">
+          {state.errorMessage ?? "Something went wrong verifying your payment."}
+        </p>
+        <p className="text-xs text-gray-400 mb-6">
+          Please contact support with your Booking ID:{" "}
+          <span className="font-mono">{state.bookingId ?? "N/A"}</span>
+        </p>
+        <button
+          onClick={() => navigate("/user/booking")}
+          className="w-full bg-red-600 text-white py-3 rounded-xl font-medium hover:bg-red-700 transition"
+        >
+          Go to Bookings
+        </button>
+      </div>
+    </div>
   );
-}
+};
+
+export default PaymentSuccessPage;
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADD THIS THUNK to src/store/slices/bookingSlice.ts
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// export const confirmBookingPayment = createAsyncThunk(
+//   "booking/confirmPayment",
+//   async (
+//     payload: {
+//       bookingId: string;
+//       razorpay_payment_id: string;
+//       razorpay_payment_link_id: string;
+//       razorpay_payment_link_reference_id: string;
+//       razorpay_payment_link_status: string;
+//       razorpay_signature: string;
+//     },
+//     { rejectWithValue }
+//   ) => {
+//     try {
+//       const res = await customAxios.post("/bookings/confirm-payment", payload);
+//       return res.data;
+//     } catch (err: any) {
+//       return rejectWithValue(err?.response?.data?.message ?? "Payment confirmation failed");
+//     }
+//   }
+// );
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADD THIS ROUTE to src/app.tsx (or your router file)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// {
+//   path: "payment/payment-success",
+//   element: <PaymentSuccessPage />,
+// }
+//
+// Make sure it's inside your user/authenticated route group.
