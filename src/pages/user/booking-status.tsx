@@ -5,6 +5,7 @@ import { RootState, AppDispatch } from "../../store";
 import { fetchMyBookings, clearError } from "../../store/slices/bookingSlice";
 import { hydrate } from "../../store/slices/authSlice";
 import { Booking, BadgeVariant } from "../../types";
+import Loader from "../../components/loader";
 import {
   Layout,
   PageHeader,
@@ -14,7 +15,6 @@ import {
   Badge,
 } from "../../components";
 import {
-  Loader2,
   Eye,
   Calendar,
   Clock,
@@ -25,7 +25,7 @@ import {
   Hourglass,
   RefreshCw,
   Filter,
-  User
+  User,
 } from "lucide-react";
 
 const decodeToken = (token: string) => {
@@ -312,13 +312,7 @@ export default function MyBookingsPage() {
     },
   ];
 
-  if (!hydrated) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#0a0a0f]">
-        <Loader2 className="w-8 h-8 text-rotary-royal animate-spin" />
-      </div>
-    );
-  }
+  if (!hydrated) return null;
 
   return (
     <Layout>
@@ -430,8 +424,8 @@ export default function MyBookingsPage() {
       <Card padding={false}>
         {loading && !refreshing ? (
           <div className="flex flex-col items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 text-rotary-royal animate-spin mb-4" />
-            <p className="text-gray-400 text-sm">Loading your bookings...</p>
+            {/* <Loader2 className="w-8 h-8 text-rotary-royal animate-spin mb-4" /> */}
+            <Loader />
           </div>
         ) : sortedBookings.length === 0 ? (
           <div className="text-center py-16">

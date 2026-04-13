@@ -133,6 +133,7 @@ export const getAvailability = (params?: AvailabilityQueryParams) => {
       },
     });
   }
+    return customAxios.get(`/v1/availability`);
 };
 
 export const getAllAvailability = () =>

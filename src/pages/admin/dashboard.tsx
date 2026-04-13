@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import customAxios from '../../utils/customAxios'
 import DashboardGrid from '../../components/dashboard/DashboardGrid'
 import Header from '../../components/layout/Header'
+import Loader from '../../components/loader'
 
 export default function DashboardPage() {
   const [dashboardData, setDashboardData] = useState<any>(null)
@@ -44,7 +45,7 @@ export default function DashboardPage() {
     fetchData()
   }, [])
 
-  if (!dashboardData) return <div>Loading...</div>
+  if (!dashboardData) return <Loader />
 
   return (
     <div className="animate-fade-in">

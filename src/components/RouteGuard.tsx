@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { UserRole } from '../types';
+import Loader from './loader';
 
 interface RouteGuardProps {
   children: React.ReactNode;
@@ -34,9 +35,7 @@ export default function RouteGuard({
 
   if (!hydrated || !isAuthenticated || !user) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rotary-royal"></div>
-      </div>
+      <Loader fullScreen/>
     );
   }
 

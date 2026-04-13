@@ -18,7 +18,7 @@ import {
   Select,
   Badge,
 } from "../../components";
-import { Loader2, Calendar, Clock, Plus, Trash2, Check, Save } from "lucide-react";
+import { Loader2, Calendar, Clock, Plus, Trash2, Check, Save, Loader } from "lucide-react";
 import { BookingItem } from "../../types";
 import Cookies from "js-cookie";
 import axios from "axios";
@@ -500,8 +500,8 @@ export default function CreateBookingPage() {
 
               {loadingSlots ? (
                 <div className="text-center py-12">
-                  <Loader2 className="w-8 h-8 mx-auto mb-3 text-rotary-royal animate-spin" />
-                  <p className="text-rotary-darkgray">Loading available slots…</p>
+                  {/* <Loader2 className="w-8 h-8 mx-auto mb-3 text-rotary-royal animate-spin" /> */}
+                  <Loader/>
                 </div>
               ) : availableSlots.length === 0 ? (
                 <div className="text-center py-12">

@@ -27,6 +27,7 @@ import {
   XCircle,
   ExternalLink,
   RefreshCw,
+  Loader,
 } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -133,8 +134,8 @@ export default function BookingDetailPage() {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-96 gap-3">
-          <Loader2 className="w-8 h-8 text-rotary-royal animate-spin" />
-          <p className="text-sm text-rotary-darkgray">Loading booking details...</p>
+          {/* <Loader2 className="w-8 h-8 text-rotary-royal animate-spin" /> */}
+          <Loader />
         </div>
       </Layout>
     );

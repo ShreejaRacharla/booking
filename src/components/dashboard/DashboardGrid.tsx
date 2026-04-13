@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSelector } from 'react-redux'
 import { RootState } from '../../store'
 import {
@@ -11,11 +11,13 @@ import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import {
   Clock, MapPin, Building2, CalendarDays,
-  CheckCircle2, AlertCircle, TrendingUp,
+  CheckCircle2, AlertCircle, TrendingUp, TrendingDown,
   Users, DollarSign, FileText, Shield,
-  Calendar, CreditCard, History
+  Calendar, CreditCard, History, GripVertical,
+  RefreshCw
 } from 'lucide-react'
 import PageHeader from '../layout/PageHeader'
+import Loader from '../loader'
 
 interface DashboardData {
   locations: number
@@ -36,7 +38,7 @@ interface DashboardData {
 
 const makeLayout = (items: LayoutItem[]): Layout => items as unknown as Layout
 
-const ADMIN_LAYOUTS: ResponsiveLayouts = {
+const ADMIN_DEFAULT_LAYOUTS: ResponsiveLayouts = {
   lg: makeLayout([
     { i: 'stats-timeslots', x: 0, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
     { i: 'stats-locations', x: 3, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
@@ -83,7 +85,7 @@ const ADMIN_LAYOUTS: ResponsiveLayouts = {
   ]),
 }
 
-const USER_LAYOUTS: ResponsiveLayouts = {
+const USER_DEFAULT_LAYOUTS: ResponsiveLayouts = {
   lg: makeLayout([
     { i: 'user-my-bookings', x: 0, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
     { i: 'user-pending', x: 3, y: 0, w: 3, h: 2, minW: 2, minH: 2 },
@@ -118,114 +120,138 @@ const USER_LAYOUTS: ResponsiveLayouts = {
   ]),
 }
 
-const ADMIN_STAT_COLORS = {
-  timeslots: { bg: 'bg-[#01B4E7]', text: 'text-[#01B4E7]', icon: Clock },
-  locations: { bg: 'bg-[#005DAA]', text: 'text-[#005DAA]', icon: MapPin },
-  facilities: { bg: 'bg-[#F7A81B]', text: 'text-[#F7A81B]', icon: Building2 },
-  bookings: { bg: 'bg-[#00246C]', text: 'text-[#00246C]', icon: CalendarDays },
-  available: { bg: 'bg-emerald-500', text: 'text-emerald-500', icon: CheckCircle2 },
-  pending: { bg: 'bg-amber-500', text: 'text-amber-500', icon: AlertCircle },
-  users: { bg: 'bg-purple-500', text: 'text-purple-500', icon: Users },
-  revenue: { bg: 'bg-green-500', text: 'text-green-500', icon: DollarSign },
+// ─── Stat card config ────────────────────────────────────────────────────────
+
+interface StatConfig {
+  bg: string
+  text: string
+  lightBg: string
+  icon: React.ComponentType<{ className?: string }>
 }
 
-const USER_STAT_COLORS = {
-  myBookings: { bg: 'bg-[#01B4E7]', text: 'text-[#01B4E7]', icon: Calendar },
-  pending: { bg: 'bg-amber-500', text: 'text-amber-500', icon: Clock },
-  approved: { bg: 'bg-emerald-500', text: 'text-emerald-500', icon: CheckCircle2 },
-  spent: { bg: 'bg-purple-500', text: 'text-purple-500', icon: CreditCard },
+const ADMIN_STAT_COLORS: Record<string, StatConfig> = {
+  timeslots: { bg: 'bg-sky-500', text: 'text-sky-500', lightBg: 'bg-sky-500/10', icon: Clock },
+  locations: { bg: 'bg-blue-600', text: 'text-blue-500', lightBg: 'bg-blue-500/10', icon: MapPin },
+  facilities: { bg: 'bg-amber-500', text: 'text-amber-500', lightBg: 'bg-amber-500/10', icon: Building2 },
+  bookings: { bg: 'bg-indigo-600', text: 'text-indigo-500', lightBg: 'bg-indigo-500/10', icon: CalendarDays },
+  available: { bg: 'bg-emerald-500', text: 'text-emerald-500', lightBg: 'bg-emerald-500/10', icon: CheckCircle2 },
+  pending: { bg: 'bg-orange-500', text: 'text-orange-500', lightBg: 'bg-orange-500/10', icon: AlertCircle },
+  users: { bg: 'bg-violet-500', text: 'text-violet-500', lightBg: 'bg-violet-500/10', icon: Users },
+  revenue: { bg: 'bg-teal-500', text: 'text-teal-500', lightBg: 'bg-teal-500/10', icon: DollarSign },
 }
+
+const USER_STAT_COLORS: Record<string, StatConfig> = {
+  myBookings: { bg: 'bg-sky-500', text: 'text-sky-500', lightBg: 'bg-sky-500/10', icon: Calendar },
+  pending: { bg: 'bg-orange-500', text: 'text-orange-500', lightBg: 'bg-orange-500/10', icon: Clock },
+  approved: { bg: 'bg-emerald-500', text: 'text-emerald-500', lightBg: 'bg-emerald-500/10', icon: CheckCircle2 },
+  spent: { bg: 'bg-violet-500', text: 'text-violet-500', lightBg: 'bg-violet-500/10', icon: CreditCard },
+}
+
+// ─── Stat card ───────────────────────────────────────────────────────────────
 
 function StatCard({
   label,
   value,
   delta,
+  deltaPositive,
   colorKey,
   isAdmin = true,
 }: {
   label: string
   value: number | string
   delta?: string
+  deltaPositive?: boolean
   colorKey: string
   isAdmin?: boolean
 }) {
   const colors = isAdmin ? ADMIN_STAT_COLORS : USER_STAT_COLORS
-  const colorConfig = colors[colorKey as keyof typeof colors] || { bg: 'bg-gray-500', text: 'text-gray-500', icon: FileText }
-  const { bg, text, icon: Icon } = colorConfig
+  const cfg = colors[colorKey as keyof typeof colors] ?? {
+    bg: 'bg-slate-500', text: 'text-slate-500', lightBg: 'bg-slate-500/10', icon: FileText,
+  }
+  const { bg, text, lightBg, icon: Icon } = cfg
+  const isPositive = deltaPositive ?? true
 
   return (
-    <div className="tile h-full flex flex-col justify-between p-5 gap-3">
-      <div className="flex items-start justify-between">
-        <p className="text-xs font-semibold uppercase tracking-widest text-foreground/50">
+    <div className="h-full flex flex-col justify-between p-5 gap-2 bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow duration-200">
+      {/* Top row */}
+      <div className="flex items-start justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground leading-tight">
           {label}
-        </p>
-        <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center shadow-lg`}>
-          <Icon className="w-5 h-5 text-white" />
+        </span>
+        <div className={`shrink-0 w-9 h-9 rounded-xl ${lightBg} flex items-center justify-center`}>
+          <Icon className={`w-4.5 h-4.5 ${text}`} />
         </div>
       </div>
-      <div>
-        <p className="text-4xl font-extrabold text-foreground">{value}</p>
-        {delta && (
-          <p className={`mt-1.5 text-xs font-medium flex items-center gap-1 ${text}`}>
-            <TrendingUp className="w-3 h-3" />
-            {delta}
-          </p>
-        )}
-      </div>
+
+      {/* Value */}
+      <p className="text-[2.2rem] font-bold leading-none tracking-tight text-foreground tabular-nums">
+        {value}
+      </p>
+
+      {/* Delta */}
+      {delta && (
+        <div className={`flex items-center gap-1 text-[11px] font-medium ${isPositive ? 'text-emerald-500' : 'text-orange-500'}`}>
+          {isPositive ? <TrendingUp className="w-3 h-3 shrink-0" /> : <TrendingDown className="w-3 h-3 shrink-0" />}
+          <span>{delta}</span>
+        </div>
+      )}
     </div>
   )
 }
 
-function RecentBookingsTile({ bookings, isAdmin }: { bookings: any[], isAdmin: boolean }) {
-  const STATUS_STYLES: Record<string, string> = {
-    PENDING: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    APPROVED: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    REJECTED: 'bg-red-500/15 text-red-400 border-red-500/30',
-    PAID: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-    CANCELLED: 'bg-gray-500/15 text-gray-400 border-gray-500/30',
-  }
+// ─── Status badge ─────────────────────────────────────────────────────────────
 
+const STATUS_BADGE: Record<string, string> = {
+  PENDING: 'bg-amber-500/12 text-amber-500 border-amber-500/25',
+  APPROVED: 'bg-emerald-500/12 text-emerald-500 border-emerald-500/25',
+  REJECTED: 'bg-red-500/12 text-red-500 border-red-500/25',
+  PAID: 'bg-sky-500/12 text-sky-500 border-sky-500/25',
+  CANCELLED: 'bg-slate-500/12 text-slate-400 border-slate-500/25',
+}
+
+// ─── Bookings tile ────────────────────────────────────────────────────────────
+
+function BookingsTile({ bookings, isAdmin }: { bookings: any[]; isAdmin: boolean }) {
   return (
-    <div className="tile h-full flex flex-col p-5 gap-4 overflow-hidden">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-foreground/50">
+    <div className="h-full flex flex-col gap-3 bg-card rounded-2xl border border-border/50 shadow-sm p-5 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between shrink-0">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
           {isAdmin ? 'Recent Bookings' : 'Upcoming Bookings'}
-        </h2>
+        </h3>
         {isAdmin && (
-          <span className="text-xs text-foreground/30 flex items-center gap-1">
-            <Shield className="w-3 h-3" /> Admin View
+          <span className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
+            <Shield className="w-3 h-3" /> Admin
           </span>
         )}
       </div>
-      <div className="overflow-auto flex-1 space-y-2 pr-1">
+
+      {/* List */}
+      <div className="flex-1 overflow-auto space-y-1.5 pr-0.5 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
         {bookings.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-foreground/30">
-            <CalendarDays className="w-12 h-12 mb-2" />
+          <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/40 py-8">
+            <CalendarDays className="w-10 h-10" />
             <p className="text-sm">{isAdmin ? 'No bookings yet' : 'No upcoming bookings'}</p>
           </div>
         ) : (
           bookings.map((b) => {
             const slotsCount = Array.isArray(b.slots) ? b.slots.length : 0
-            const totalAmount = b.totalAmount || 0
-            const bookingDate = b.date || 'N/A'
+            const statusStyle = STATUS_BADGE[b.status] ?? STATUS_BADGE.PENDING
 
             return (
               <div
                 key={b.id}
-                className="flex items-center justify-between rounded-xl px-4 py-3 bg-white/5 hover:bg-white/10 transition-colors border border-border/30 gap-3"
+                className="group flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-muted/30 hover:bg-muted/60 transition-colors border border-transparent hover:border-border/40"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-sm text-foreground truncate">
-                    {isAdmin ? `${b.id} — ${b.userName || 'Unknown User'}` : b.facilityName || 'Facility'}
+                  <p className="font-medium text-sm text-foreground truncate leading-snug">
+                    {isAdmin ? `#${b.id} · ${b.userName ?? 'Unknown'}` : (b.facilityName ?? 'Facility')}
                   </p>
-                  <p className="text-xs text-foreground/50 mt-0.5">
-                    {bookingDate} · {slotsCount} slot(s) · ₹{totalAmount}
+                  <p className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
+                    {b.date ?? 'N/A'} · {slotsCount} slot{slotsCount !== 1 ? 's' : ''} · ₹{b.totalAmount ?? 0}
                   </p>
                 </div>
-                <span
-                  className={`text-xs px-2.5 py-1 rounded-full border font-medium whitespace-nowrap ${STATUS_STYLES[b.status] || STATUS_STYLES.PENDING
-                    }`}
-                >
+                <span className={`shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-full border ${statusStyle}`}>
                   {b.status}
                 </span>
               </div>
@@ -237,27 +263,45 @@ function RecentBookingsTile({ bookings, isAdmin }: { bookings: any[], isAdmin: b
   )
 }
 
-function QuickActionsTile({ onAction }: { onAction: (action: string) => void }) {
+// ─── Quick actions tile ───────────────────────────────────────────────────────
+
+function QuickActionsTile({ onAction }: { onAction: (a: string) => void }) {
   const actions = [
-    { label: 'Book Now', icon: Calendar, action: 'book', color: 'bg-[#01B4E7] hover:bg-[#01B4E7]/90' },
-    { label: 'View History', icon: History, action: 'history', color: 'bg-[#005DAA] hover:bg-[#005DAA]/90' },
-    // { label: 'Make Payment', icon: CreditCard, action: 'payment', color: 'bg-emerald-500 hover:bg-emerald-500/90' },
+    {
+      label: 'Book a Slot',
+      description: 'Reserve a facility',
+      icon: Calendar,
+      action: 'book',
+      className: 'bg-sky-500 hover:bg-sky-600 text-white',
+    },
+    {
+      label: 'View History',
+      description: 'Past bookings',
+      icon: History,
+      action: 'history',
+      className: 'bg-muted hover:bg-muted/80 text-foreground border border-border/50',
+    },
   ]
 
   return (
-    <div className="tile h-full flex flex-col p-5 gap-4">
-      <h2 className="text-sm font-bold uppercase tracking-widest text-foreground/50">
+    <div className="h-full flex flex-col gap-3 bg-card rounded-2xl border border-border/50 shadow-sm p-5">
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground shrink-0">
         Quick Actions
-      </h2>
-      <div className="flex flex-col gap-3 flex-1 justify-center">
-        {actions.map(({ label, icon: Icon, action, color }) => (
+      </h3>
+      <div className="flex flex-col gap-2.5 flex-1 justify-center">
+        {actions.map(({ label, description, icon: Icon, action, className }) => (
           <button
             key={action}
             onClick={() => onAction(action)}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl text-white font-medium transition-all ${color}`}
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-medium text-sm transition-all active:scale-[0.98] ${className}`}
           >
-            <Icon className="w-5 h-5" />
-            {label}
+            <div className="w-8 h-8 rounded-lg bg-black/10 flex items-center justify-center shrink-0">
+              <Icon className="w-4 h-4" />
+            </div>
+            <div className="text-left min-w-0">
+              <p className="font-semibold text-sm leading-tight">{label}</p>
+              <p className="text-[11px] opacity-70 mt-0.5">{description}</p>
+            </div>
           </button>
         ))}
       </div>
@@ -265,225 +309,230 @@ function QuickActionsTile({ onAction }: { onAction: (action: string) => void }) 
   )
 }
 
+// ─── Storage helpers (localStorage) ──────────────────────────────────────────
+
+const STORAGE_KEY_PREFIX = 'dashboard-layout'
+
+function getStorageKey(role: string) {
+  return `${STORAGE_KEY_PREFIX}-${role}`
+}
+
+function loadSavedLayout(role: string): ResponsiveLayouts | null {
+  try {
+    const raw = localStorage.getItem(getStorageKey(role))
+    if (raw) return JSON.parse(raw) as ResponsiveLayouts
+  } catch {
+    // parse error — fall through to defaults
+  }
+  return null
+}
+
+function saveLayout(role: string, layouts: ResponsiveLayouts) {
+  try {
+    localStorage.setItem(getStorageKey(role), JSON.stringify(layouts))
+  } catch (err) {
+    console.warn('Could not persist dashboard layout:', err)
+  }
+}
+
+function clearSavedLayout(role: string) {
+  try {
+    localStorage.removeItem(getStorageKey(role))
+  } catch { /* ignore */ }
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function DashboardGrid({ initialData }: { initialData: DashboardData }) {
   const user = useSelector((s: RootState) => s.auth.user)
   const isAdmin = user?.role === 'admin'
+  const role = isAdmin ? 'admin' : 'user'
 
-  const [layouts, setLayouts] = useState<ResponsiveLayouts>(isAdmin ? ADMIN_LAYOUTS : USER_LAYOUTS)
+  const defaultLayouts = isAdmin ? ADMIN_DEFAULT_LAYOUTS : USER_DEFAULT_LAYOUTS
+
+  const [layouts, setLayouts] = useState<ResponsiveLayouts>(defaultLayouts)
   const [isDragging, setIsDragging] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const [layoutLoaded, setLayoutLoaded] = useState(false)
+  const [containerWidth, setContainerWidth] = useState(1200)
+  const containerRef = useRef<HTMLDivElement>(null)
 
+  // Measure container width via ResizeObserver
   useEffect(() => {
-    setIsMounted(true)
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setContainerWidth(entry.contentRect.width))
+    ro.observe(el)
+    setContainerWidth(el.offsetWidth)
+    return () => ro.disconnect()
   }, [])
 
+  // Hydrate from storage on mount
   useEffect(() => {
-    setLayouts(isAdmin ? ADMIN_LAYOUTS : USER_LAYOUTS)
-  }, [isAdmin])
+    setIsMounted(true)
+    const saved = loadSavedLayout(role)
+    if (saved) setLayouts(saved)
+    setLayoutLoaded(true)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync when role changes (e.g. admin/user toggle)
+  useEffect(() => {
+    setLayoutLoaded(false)
+    const saved = loadSavedLayout(role)
+    setLayouts(saved ?? defaultLayouts)
+    setLayoutLoaded(true)
+  }, [role]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLayoutChange = useCallback(
     (_layout: Layout, allLayouts: ResponsiveLayouts) => {
       setLayouts(allLayouts)
+      saveLayout(role, allLayouts)
     },
-    []
+    [role]
   )
 
+  const resetLayout = useCallback(() => {
+    clearSavedLayout(role)
+    setLayouts(defaultLayouts)
+  }, [role, defaultLayouts])
+
   const handleQuickAction = (action: string) => {
-    console.log('Quick action:', action)
-    switch (action) {
-      case 'book':
-        window.location.href = '/user/booking'
-        break
-      case 'history':
-        window.location.href = '/user/booking-status'
-        break
-      // case 'payment':
-      //   window.location.href = '/user/payment'
-      //   break
-    }
+    if (action === 'book') window.location.href = '/user/booking'
+    if (action === 'history') window.location.href = '/user/booking-status'
   }
 
-  if (!isMounted) {
-    return (
-      <div className="w-full h-[600px] flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-[#01B4E7]/20 border-t-[#01B4E7] animate-spin" />
-      </div>
-    )
+  if (!isMounted || !layoutLoaded) {
+    return 
+        <Loader />
   }
 
   const ADMIN_TILES: Record<string, React.ReactNode> = {
     'stats-timeslots': (
-      <StatCard
-        label="Time Slots"
-        value={initialData.timeSlots}
-        delta="↑ 12% this month"
-        colorKey="timeslots"
-        isAdmin={true}
-      />
+      <StatCard label="Time Slots" value={initialData.timeSlots} delta="12% this month" colorKey="timeslots" isAdmin />
     ),
     'stats-locations': (
-      <StatCard
-        label="Locations"
-        value={initialData.locations}
-        delta="2 active clubs"
-        colorKey="locations"
-        isAdmin={true}
-      />
+      <StatCard label="Locations" value={initialData.locations} delta="2 active clubs" colorKey="locations" isAdmin />
     ),
     'stats-facilities': (
-      <StatCard
-        label="Facilities"
-        value={initialData.facilities}
-        delta="All operational"
-        colorKey="facilities"
-        isAdmin={true}
-      />
+      <StatCard label="Facilities" value={initialData.facilities} delta="All operational" deltaPositive={true} colorKey="facilities" isAdmin />
     ),
     'stats-bookings': (
-      <StatCard
-        label="Total Bookings"
-        value={initialData.totalBookings}
-        delta="↑ 8% from last week"
-        colorKey="bookings"
-        isAdmin={true}
-      />
+      <StatCard label="Total Bookings" value={initialData.totalBookings} delta="8% from last week" colorKey="bookings" isAdmin />
     ),
     'stats-available': (
-      <StatCard
-        label="Available Slots"
-        value={initialData.availableSlots}
-        delta="Ready to book"
-        colorKey="available"
-        isAdmin={true}
-      />
+      <StatCard label="Available Slots" value={initialData.availableSlots} delta="Ready to book" colorKey="available" isAdmin />
     ),
     'stats-pending': (
-      <StatCard
-        label="Pending Approvals"
-        value={initialData.pendingApprovals}
-        delta="Requires action"
-        colorKey="pending"
-        isAdmin={true}
-      />
+      <StatCard label="Pending Approvals" value={initialData.pendingApprovals} delta="Requires action" deltaPositive={false} colorKey="pending" isAdmin />
     ),
     'stats-users': (
-      <StatCard
-        label="Total Users"
-        value={initialData.totalUsers || 0}
-        delta="Active members"
-        colorKey="users"
-        isAdmin={true}
-      />
+      <StatCard label="Total Users" value={initialData.totalUsers ?? 0} delta="Active members" colorKey="users" isAdmin />
     ),
     'stats-revenue': (
-      <StatCard
-        label="Total Revenue"
-        value={`₹${initialData.totalRevenue || 0}`}
-        delta="↑ 15% this month"
-        colorKey="revenue"
-        isAdmin={true}
-      />
+      <StatCard label="Total Revenue" value={`₹${(initialData.totalRevenue ?? 0).toLocaleString()}`} delta="15% this month" colorKey="revenue" isAdmin />
     ),
-    'recent-bookings': <RecentBookingsTile bookings={initialData.recentBookings} isAdmin={true} />,
+    'recent-bookings': <BookingsTile bookings={initialData.recentBookings} isAdmin={true} />,
   }
 
   const USER_TILES: Record<string, React.ReactNode> = {
     'user-my-bookings': (
-      <StatCard
-        label="My Bookings"
-        value={initialData.myBookings || 0}
-        delta="Total bookings made"
-        colorKey="myBookings"
-        isAdmin={false}
-      />
+      <StatCard label="My Bookings" value={initialData.myBookings ?? 0} delta="Total bookings" colorKey="myBookings" isAdmin={false} />
     ),
     'user-pending': (
-      <StatCard
-        label="Pending"
-        value={initialData.myPendingBookings || 0}
-        delta="Awaiting approval"
-        colorKey="pending"
-        isAdmin={false}
-      />
+      <StatCard label="Pending" value={initialData.myPendingBookings ?? 0} delta="Awaiting approval" deltaPositive={false} colorKey="pending" isAdmin={false} />
     ),
     'user-approved': (
-      <StatCard
-        label="Approved"
-        value={initialData.myApprovedBookings || 0}
-        delta="Ready to use"
-        colorKey="approved"
-        isAdmin={false}
-      />
+      <StatCard label="Approved" value={initialData.myApprovedBookings ?? 0} delta="Ready to use" colorKey="approved" isAdmin={false} />
     ),
     'user-spent': (
-      <StatCard
-        label="Total Spent"
-        value={`₹${initialData.myTotalSpent || 0}`}
-        delta="This year"
-        colorKey="spent"
-        isAdmin={false}
-      />
+      <StatCard label="Total Spent" value={`₹${(initialData.myTotalSpent ?? 0).toLocaleString()}`} delta="This year" colorKey="spent" isAdmin={false} />
     ),
-    'upcoming-bookings': <RecentBookingsTile bookings={initialData.upcomingBookings || []} isAdmin={false} />,
+    'upcoming-bookings': <BookingsTile bookings={initialData.upcomingBookings ?? []} isAdmin={false} />,
     'quick-actions': <QuickActionsTile onAction={handleQuickAction} />,
   }
 
   const TILES = isAdmin ? ADMIN_TILES : USER_TILES
 
   return (
-    <div className="select-none w-full p-4">
-      <PageHeader
-        title={isAdmin ? "Admin Dashboard" : "My Dashboard"}
-        subtitle={isAdmin ? "Manage bookings, facilities and users" : `Welcome back, ${user?.name || 'User'}!`}
-      />
-
-      <div className={`mb-4 px-4 py-2 rounded-lg flex items-center gap-2 ${isAdmin
-          ? 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20'
-          : 'bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-cyan-500/20'
-        }`}>
-        {isAdmin ? (
-          <>
-            <Shield className="w-4 h-4 text-amber-400" />
-            <span className="text-sm text-amber-400 font-medium">Admin</span>
-            {/* <span className="text-xs text-foreground/50 ml-2">You have full access to all features</span> */}
-          </>
-        ) : (
-          <>
-            <Users className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm text-cyan-400 font-medium">Member</span>
-            {/* <span className="text-xs text-foreground/50 ml-2">View and manage your bookings</span> */}
-          </>
-        )}
+    <div className="select-none w-full pb-6">
+      {/* ── Header ── */}
+      <div className="px-4 pt-2 pb-1">
+        <PageHeader
+          title={isAdmin ? 'Admin Dashboard' : 'My Dashboard'}
+          subtitle={
+            isAdmin
+              ? 'Manage bookings, facilities and users'
+              : `Welcome back, ${user?.name ?? 'User'}!`
+          }
+        />
       </div>
 
-      <ResponsiveGridLayout
-        className="layout"
-        width={1200}
-        layouts={layouts}
-        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
-        cols={{ lg: 12, md: 10, sm: 6, xs: 4 }}
-        rowHeight={60}
-        margin={[16, 16] as [number, number]}
-        containerPadding={[0, 0] as [number, number]}
-        onLayoutChange={handleLayoutChange}
-        onDragStart={() => setIsDragging(true)}
-        onDragStop={() => setIsDragging(false)}
-      >
-        {Object.entries(TILES).map(([key, node]) => (
-          <div
-            key={key}
-            className={`group relative rounded-2xl overflow-hidden transition-shadow duration-200 ${isDragging ? 'shadow-none' : 'shadow-lg shadow-black/20'
-              }`}
+      {/* ── Role badge + controls ── */}
+      <div className="mx-4 mb-4 flex items-center justify-between gap-3">
+        <div
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold ${
+            isAdmin
+              ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+              : 'bg-sky-500/10 text-sky-500 border border-sky-500/20'
+          }`}
+        >
+          {isAdmin ? <Shield className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
+          {isAdmin ? 'Admin View' : 'Member View'}
+        </div>
+
+        {/* Layout controls */}
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
+            <GripVertical className="w-3 h-3" /> Drag tiles to rearrange
+          </span>
+          <button
+            onClick={resetLayout}
+            title="Reset to default layout"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors border border-border/40"
           >
-            <div className="drag-handle absolute top-0 left-0 right-0 h-7 z-10 cursor-grab active:cursor-grabbing flex items-center px-3 gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-b from-black/30 to-transparent rounded-t-2xl">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <span key={i} className="w-1 h-1 rounded-full bg-white/60" />
-              ))}
+            <RefreshCw className="w-3 h-3" />
+            <span className="hidden sm:inline">Reset</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Grid ── */}
+      <div className="px-4" ref={containerRef}>
+        <ResponsiveGridLayout
+          className="layout"
+          width={containerWidth}
+          layouts={layouts}
+          breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
+          cols={{ lg: 12, md: 10, sm: 6, xs: 4 }}
+          rowHeight={62}
+          margin={[12, 12]}
+          containerPadding={[0, 0]}
+          dragConfig={{ handle: '.drag-handle' }}
+          onLayoutChange={handleLayoutChange}
+          onDragStart={() => setIsDragging(true)}
+          onDragStop={() => setIsDragging(false)}
+        >
+          {Object.entries(TILES).map(([key, node]) => (
+            <div
+              key={key}
+              className={`group relative rounded-2xl overflow-hidden transition-all duration-150 ${
+                isDragging ? 'opacity-90 scale-[0.99]' : ''
+              }`}
+            >
+              {/* Drag handle — visible on hover */}
+              <div className="drag-handle absolute top-0 left-0 right-0 h-8 z-20 cursor-grab active:cursor-grabbing flex items-center px-3 gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-b from-black/20 to-transparent rounded-t-2xl">
+                <GripVertical className="w-3.5 h-3.5 text-white/70" />
+                <div className="flex gap-0.5 ml-auto">
+                  {[...Array(3)].map((_, i) => (
+                    <span key={i} className="w-1 h-1 rounded-full bg-white/50" />
+                  ))}
+                </div>
+              </div>
+              {node}
             </div>
-            {node}
-          </div>
-        ))}
-      </ResponsiveGridLayout>
+          ))}
+        </ResponsiveGridLayout>
+      </div>
     </div>
   )
 }

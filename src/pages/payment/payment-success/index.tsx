@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { useDispatch } from "react-redux";
-import { AppDispatch } from "@/store";
-import { confirmBookingPayment } from "@/store/slices/bookingSlice";
+import { AppDispatch } from "../../../store";
+import { confirmBookingPayment } from "../../../store/slices/bookingSlice";
 
 interface PaymentSuccessState {
     status: "loading" | "success" | "failed" | "cancelled";
