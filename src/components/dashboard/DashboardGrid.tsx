@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSelector } from 'react-redux'
 import { RootState } from '../../store'
+import { useRouter } from 'next/router'
 import {
   ResponsiveGridLayout,
   Layout,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react'
 import PageHeader from '../layout/PageHeader'
 import Loader from '../loader'
+import Cookies from 'js-cookie'
 
 interface DashboardData {
   locations: number
@@ -120,8 +122,6 @@ const USER_DEFAULT_LAYOUTS: ResponsiveLayouts = {
   ]),
 }
 
-// ─── Stat card config ────────────────────────────────────────────────────────
-
 interface StatConfig {
   bg: string
   text: string
@@ -147,8 +147,6 @@ const USER_STAT_COLORS: Record<string, StatConfig> = {
   spent: { bg: 'bg-violet-500', text: 'text-violet-500', lightBg: 'bg-violet-500/10', icon: CreditCard },
 }
 
-// ─── Stat card ───────────────────────────────────────────────────────────────
-
 function StatCard({
   label,
   value,
@@ -173,7 +171,6 @@ function StatCard({
 
   return (
     <div className="h-full flex flex-col justify-between p-5 gap-2 bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow duration-200">
-      {/* Top row */}
       <div className="flex items-start justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground leading-tight">
           {label}
@@ -183,12 +180,10 @@ function StatCard({
         </div>
       </div>
 
-      {/* Value */}
       <p className="text-[2.2rem] font-bold leading-none tracking-tight text-foreground tabular-nums">
         {value}
       </p>
 
-      {/* Delta */}
       {delta && (
         <div className={`flex items-center gap-1 text-[11px] font-medium ${isPositive ? 'text-emerald-500' : 'text-orange-500'}`}>
           {isPositive ? <TrendingUp className="w-3 h-3 shrink-0" /> : <TrendingDown className="w-3 h-3 shrink-0" />}
@@ -199,25 +194,24 @@ function StatCard({
   )
 }
 
-// ─── Status badge ─────────────────────────────────────────────────────────────
-
 const STATUS_BADGE: Record<string, string> = {
+  DRAFT: 'bg-slate-500/12 text-slate-500 border-slate-500/25',
   PENDING: 'bg-amber-500/12 text-amber-500 border-amber-500/25',
+  PENDING_APPROVAL: 'bg-amber-500/12 text-amber-500 border-amber-500/25',
   APPROVED: 'bg-emerald-500/12 text-emerald-500 border-emerald-500/25',
+  APPROVED_PENDING_PAYMENT: 'bg-blue-500/12 text-blue-500 border-blue-500/25',
+  CONFIRMED_FULL: 'bg-emerald-500/12 text-emerald-500 border-emerald-500/25',
   REJECTED: 'bg-red-500/12 text-red-500 border-red-500/25',
   PAID: 'bg-sky-500/12 text-sky-500 border-sky-500/25',
   CANCELLED: 'bg-slate-500/12 text-slate-400 border-slate-500/25',
 }
 
-// ─── Bookings tile ────────────────────────────────────────────────────────────
-
 function BookingsTile({ bookings, isAdmin }: { bookings: any[]; isAdmin: boolean }) {
   return (
     <div className="h-full flex flex-col gap-3 bg-card rounded-2xl border border-border/50 shadow-sm p-5 overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-          {isAdmin ? 'Recent Bookings' : 'Upcoming Bookings'}
+          {isAdmin ? 'Recent Bookings' : 'My Bookings'}
         </h3>
         {isAdmin && (
           <span className="flex items-center gap-1 text-[11px] text-muted-foreground/60">
@@ -226,8 +220,7 @@ function BookingsTile({ bookings, isAdmin }: { bookings: any[]; isAdmin: boolean
         )}
       </div>
 
-      {/* List */}
-      <div className="flex-1 overflow-auto space-y-1.5 pr-0.5 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+      <div className="flex-1 overflow-auto space-y-2 pr-0.5 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
         {bookings.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-2 text-muted-foreground/40 py-8">
             <CalendarDays className="w-10 h-10" />
@@ -235,25 +228,60 @@ function BookingsTile({ bookings, isAdmin }: { bookings: any[]; isAdmin: boolean
           </div>
         ) : (
           bookings.map((b) => {
-            const slotsCount = Array.isArray(b.slots) ? b.slots.length : 0
             const statusStyle = STATUS_BADGE[b.status] ?? STATUS_BADGE.PENDING
 
             return (
               <div
                 key={b.id}
-                className="group flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-muted/30 hover:bg-muted/60 transition-colors border border-transparent hover:border-border/40"
+                className="group flex flex-col gap-2 px-4 py-3 rounded-xl bg-muted/30 hover:bg-muted/60 transition-all border border-transparent hover:border-border/40 hover:shadow-sm"
               >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-sm text-foreground truncate leading-snug">
-                    {isAdmin ? `#${b.id} · ${b.userName ?? 'Unknown'}` : (b.facilityName ?? 'Facility')}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 tabular-nums">
-                    {b.date ?? 'N/A'} · {slotsCount} slot{slotsCount !== 1 ? 's' : ''} · ₹{b.totalAmount ?? 0}
-                  </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-sm text-foreground truncate leading-tight">
+                      {b.facilityName || 'Unknown Facility'}
+                    </p>
+                    {isAdmin && b.userName && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        👤 {b.userName}
+                      </p>
+                    )}
+                  </div>
+                  <span className={`shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-full border whitespace-nowrap ${statusStyle}`}>
+                    {b.status?.replace(/_/g, ' ')}
+                  </span>
                 </div>
-                <span className={`shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-full border ${statusStyle}`}>
-                  {b.status}
-                </span>
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3 shrink-0" />
+                    <span className="font-medium">{b.date || 'N/A'}</span>
+                  </div>
+
+                  {b.timeRanges && b.timeRanges !== 'N/A' && (
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 shrink-0" />
+                      <span className="font-medium">{b.timeRanges}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded">
+                    <span className="font-semibold text-foreground">{b.slotCount || 0}</span>
+                    <span>slot{b.slotCount !== 1 ? 's' : ''}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 ml-auto">
+                    <DollarSign className="w-3 h-3 shrink-0" />
+                    <span className="font-bold text-foreground">
+                      ₹{(b.totalAmount || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+
+                {b.bookingCode && (
+                  <div className="text-[10px] text-muted-foreground/60 font-mono">
+                    #{b.bookingCode}
+                  </div>
+                )}
               </div>
             )
           })
@@ -262,8 +290,6 @@ function BookingsTile({ bookings, isAdmin }: { bookings: any[]; isAdmin: boolean
     </div>
   )
 }
-
-// ─── Quick actions tile ───────────────────────────────────────────────────────
 
 function QuickActionsTile({ onAction }: { onAction: (a: string) => void }) {
   const actions = [
@@ -309,8 +335,6 @@ function QuickActionsTile({ onAction }: { onAction: (a: string) => void }) {
   )
 }
 
-// ─── Storage helpers (localStorage) ──────────────────────────────────────────
-
 const STORAGE_KEY_PREFIX = 'dashboard-layout'
 
 function getStorageKey(role: string) {
@@ -319,32 +343,45 @@ function getStorageKey(role: string) {
 
 function loadSavedLayout(role: string): ResponsiveLayouts | null {
   try {
-    const raw = localStorage.getItem(getStorageKey(role))
-    if (raw) return JSON.parse(raw) as ResponsiveLayouts
-  } catch {
-    // parse error — fall through to defaults
+    if (typeof window === 'undefined') return null
+    const cookieData = Cookies.get(getStorageKey(role))
+    if (cookieData) {
+      return JSON.parse(cookieData) as ResponsiveLayouts
+    }
+  } catch (err) {
+    console.warn('Could not load dashboard layout from cookies:', err)
   }
   return null
 }
 
 function saveLayout(role: string, layouts: ResponsiveLayouts) {
   try {
-    localStorage.setItem(getStorageKey(role), JSON.stringify(layouts))
+    if (typeof window === 'undefined') return
+    Cookies.set(getStorageKey(role), JSON.stringify(layouts), { 
+      expires: 1,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production'
+    })
   } catch (err) {
-    console.warn('Could not persist dashboard layout:', err)
+    console.warn('Could not persist dashboard layout to cookies:', err)
   }
 }
 
 function clearSavedLayout(role: string) {
   try {
-    localStorage.removeItem(getStorageKey(role))
-  } catch { /* ignore */ }
+    if (typeof window === 'undefined') return
+    Cookies.remove(getStorageKey(role))
+  } catch (err) {
+    console.warn('Could not clear dashboard layout from cookies:', err)
+  }
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-
 export default function DashboardGrid({ initialData }: { initialData: DashboardData }) {
+  const router = useRouter()
   const user = useSelector((s: RootState) => s.auth.user)
+  
+  const [authLoaded, setAuthLoaded] = useState(false)
+  
   const isAdmin = user?.role === 'admin'
   const role = isAdmin ? 'admin' : 'user'
 
@@ -357,7 +394,11 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
   const [containerWidth, setContainerWidth] = useState(1200)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Measure container width via ResizeObserver
+  useEffect(() => {
+    const timer = setTimeout(() => setAuthLoaded(true), 100)
+    return () => clearTimeout(timer)
+  }, [])
+
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -367,21 +408,19 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
     return () => ro.disconnect()
   }, [])
 
-  // Hydrate from storage on mount
   useEffect(() => {
     setIsMounted(true)
     const saved = loadSavedLayout(role)
     if (saved) setLayouts(saved)
     setLayoutLoaded(true)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [role]) 
 
-  // Sync when role changes (e.g. admin/user toggle)
   useEffect(() => {
     setLayoutLoaded(false)
     const saved = loadSavedLayout(role)
     setLayouts(saved ?? defaultLayouts)
     setLayoutLoaded(true)
-  }, [role]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [role, defaultLayouts]) 
 
   const handleLayoutChange = useCallback(
     (_layout: Layout, allLayouts: ResponsiveLayouts) => {
@@ -397,57 +436,60 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
   }, [role, defaultLayouts])
 
   const handleQuickAction = (action: string) => {
-    if (action === 'book') window.location.href = '/user/booking'
-    if (action === 'history') window.location.href = '/user/booking-status'
+    if (action === 'book') router.push('/user/booking')
+    if (action === 'history') router.push('/user/booking-status')
   }
 
-  if (!isMounted || !layoutLoaded) {
-    return 
+  if (!isMounted || !layoutLoaded || !authLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
         <Loader />
+      </div>
+    )
   }
 
   const ADMIN_TILES: Record<string, React.ReactNode> = {
     'stats-timeslots': (
-      <StatCard label="Time Slots" value={initialData.timeSlots} delta="12% this month" colorKey="timeslots" isAdmin />
+      <StatCard label="Time Slots" value={initialData.timeSlots || 0} delta="12% this month" colorKey="timeslots" isAdmin />
     ),
     'stats-locations': (
-      <StatCard label="Locations" value={initialData.locations} delta="2 active clubs" colorKey="locations" isAdmin />
+      <StatCard label="Locations" value={initialData.locations || 0} delta="Active locations" colorKey="locations" isAdmin />
     ),
     'stats-facilities': (
-      <StatCard label="Facilities" value={initialData.facilities} delta="All operational" deltaPositive={true} colorKey="facilities" isAdmin />
+      <StatCard label="Facilities" value={initialData.facilities || 0} delta="All operational" deltaPositive={true} colorKey="facilities" isAdmin />
     ),
     'stats-bookings': (
-      <StatCard label="Total Bookings" value={initialData.totalBookings} delta="8% from last week" colorKey="bookings" isAdmin />
+      <StatCard label="Total Bookings" value={initialData.totalBookings || 0} delta="All time" colorKey="bookings" isAdmin />
     ),
     'stats-available': (
-      <StatCard label="Available Slots" value={initialData.availableSlots} delta="Ready to book" colorKey="available" isAdmin />
+      <StatCard label="Available Slots" value={initialData.availableSlots || 0} delta="Ready to book" colorKey="available" isAdmin />
     ),
     'stats-pending': (
-      <StatCard label="Pending Approvals" value={initialData.pendingApprovals} delta="Requires action" deltaPositive={false} colorKey="pending" isAdmin />
+      <StatCard label="Pending Approvals" value={initialData.pendingApprovals || 0} delta="Requires action" deltaPositive={false} colorKey="pending" isAdmin />
     ),
     'stats-users': (
-      <StatCard label="Total Users" value={initialData.totalUsers ?? 0} delta="Active members" colorKey="users" isAdmin />
+      <StatCard label="Total Users" value={initialData.totalUsers || 0} delta="Active members" colorKey="users" isAdmin />
     ),
     'stats-revenue': (
-      <StatCard label="Total Revenue" value={`₹${(initialData.totalRevenue ?? 0).toLocaleString()}`} delta="15% this month" colorKey="revenue" isAdmin />
+      <StatCard label="Total Revenue" value={`₹${(initialData.totalRevenue || 0).toLocaleString('en-IN')}`} delta="All time" colorKey="revenue" isAdmin />
     ),
-    'recent-bookings': <BookingsTile bookings={initialData.recentBookings} isAdmin={true} />,
+    'recent-bookings': <BookingsTile bookings={initialData.recentBookings || []} isAdmin={true} />,
   }
 
   const USER_TILES: Record<string, React.ReactNode> = {
     'user-my-bookings': (
-      <StatCard label="My Bookings" value={initialData.myBookings ?? 0} delta="Total bookings" colorKey="myBookings" isAdmin={false} />
+      <StatCard label="My Bookings" value={initialData.myBookings || 0} delta="Total bookings" colorKey="myBookings" isAdmin={false} />
     ),
     'user-pending': (
-      <StatCard label="Pending" value={initialData.myPendingBookings ?? 0} delta="Awaiting approval" deltaPositive={false} colorKey="pending" isAdmin={false} />
+      <StatCard label="Pending" value={initialData.myPendingBookings || 0} delta="Awaiting approval" deltaPositive={false} colorKey="pending" isAdmin={false} />
     ),
     'user-approved': (
-      <StatCard label="Approved" value={initialData.myApprovedBookings ?? 0} delta="Ready to use" colorKey="approved" isAdmin={false} />
+      <StatCard label="Approved" value={initialData.myApprovedBookings || 0} delta="Ready to use" colorKey="approved" isAdmin={false} />
     ),
     'user-spent': (
-      <StatCard label="Total Spent" value={`₹${(initialData.myTotalSpent ?? 0).toLocaleString()}`} delta="This year" colorKey="spent" isAdmin={false} />
+      <StatCard label="Total Spent" value={`₹${(initialData.myTotalSpent || 0).toLocaleString('en-IN')}`} delta="This year" colorKey="spent" isAdmin={false} />
     ),
-    'upcoming-bookings': <BookingsTile bookings={initialData.upcomingBookings ?? []} isAdmin={false} />,
+    'upcoming-bookings': <BookingsTile bookings={initialData.upcomingBookings || []} isAdmin={false} />,
     'quick-actions': <QuickActionsTile onAction={handleQuickAction} />,
   }
 
@@ -455,32 +497,28 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
 
   return (
     <div className="select-none w-full pb-6">
-      {/* ── Header ── */}
       <div className="px-4 pt-2 pb-1">
         <PageHeader
           title={isAdmin ? 'Admin Dashboard' : 'My Dashboard'}
           subtitle={
             isAdmin
               ? 'Manage bookings, facilities and users'
-              : `Welcome back, ${user?.name ?? 'User'}!`
+              : `Welcome back, ${user?.name || 'User'}!`
           }
         />
       </div>
 
-      {/* ── Role badge + controls ── */}
       <div className="mx-4 mb-4 flex items-center justify-between gap-3">
         <div
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold ${
-            isAdmin
-              ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-              : 'bg-sky-500/10 text-sky-500 border border-sky-500/20'
-          }`}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold ${isAdmin
+            ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+            : 'bg-sky-500/10 text-sky-500 border border-sky-500/20'
+            }`}
         >
           {isAdmin ? <Shield className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
           {isAdmin ? 'Admin View' : 'Member View'}
         </div>
 
-        {/* Layout controls */}
         <div className="flex items-center gap-2">
           <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-muted-foreground/60">
             <GripVertical className="w-3 h-3" /> Drag tiles to rearrange
@@ -496,7 +534,6 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
         </div>
       </div>
 
-      {/* ── Grid ── */}
       <div className="px-4" ref={containerRef}>
         <ResponsiveGridLayout
           className="layout"
@@ -507,7 +544,6 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
           rowHeight={62}
           margin={[12, 12]}
           containerPadding={[0, 0]}
-          dragConfig={{ handle: '.drag-handle' }}
           onLayoutChange={handleLayoutChange}
           onDragStart={() => setIsDragging(true)}
           onDragStop={() => setIsDragging(false)}
@@ -515,11 +551,9 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
           {Object.entries(TILES).map(([key, node]) => (
             <div
               key={key}
-              className={`group relative rounded-2xl overflow-hidden transition-all duration-150 ${
-                isDragging ? 'opacity-90 scale-[0.99]' : ''
-              }`}
+              className={`group relative rounded-2xl overflow-hidden transition-all duration-150 ${isDragging ? 'opacity-90 scale-[0.99]' : ''
+                }`}
             >
-              {/* Drag handle — visible on hover */}
               <div className="drag-handle absolute top-0 left-0 right-0 h-8 z-20 cursor-grab active:cursor-grabbing flex items-center px-3 gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-b from-black/20 to-transparent rounded-t-2xl">
                 <GripVertical className="w-3.5 h-3.5 text-white/70" />
                 <div className="flex gap-0.5 ml-auto">

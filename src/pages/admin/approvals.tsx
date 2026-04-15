@@ -49,13 +49,13 @@ function getUserIdFromToken(): string | null {
     }
 
     if (!token) {
-      console.error("❌ accessToken cookie nahi mili");
+      console.error("accessToken cookie not found");
       return null;
     }
 
     const payloadBase64 = token.split(".")[1];
     if (!payloadBase64) {
-      console.error("❌ Invalid JWT format");
+      console.error("Invalid JWT format");
       return null;
     }
 
@@ -69,12 +69,32 @@ function getUserIdFromToken(): string | null {
 
     const payload = JSON.parse(jsonStr);
     const userId = payload.id || null;
-    console.log("🔑 JWT payload.id (UUID):", userId);
-
     return userId ? String(userId) : null;
   } catch (err) {
-    console.error("❌ JWT decode failed:", err);
+    console.error("JWT decode failed:", err);
     return null;
+  }
+}
+
+function formatCreatedAt(createdAt: string | number | undefined): string {
+  if (!createdAt) return "N/A";
+
+  try {
+    if (typeof createdAt === "string" && createdAt.includes("-")) {
+      return createdAt;
+    }
+
+    const date = new Date(createdAt);
+    return date.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return String(createdAt);
   }
 }
 
@@ -155,12 +175,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
     return ["PENDING", "PENDING_APPROVAL", "SUBMITTED"].includes(status);
   };
 
-  const getApprovedActionTime = (approvals?: BookingApproval[]): string | null => {
-    if (!approvals) return null;
-    const approvedEntry = approvals.find((a) => a.status === "APPROVED");
-    return approvedEntry?.actionTime || null;
-  };
-
   const filtered = filter === "ALL"
     ? bookings
     : bookings.filter((b) => filterStatusMap[filter].includes(b.status));
@@ -171,8 +185,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
   };
 
   const handleApprove = async (booking: Booking) => {
-    console.log("🔐 Approving booking:", booking.id, "with approverUserId (from JWT):", approverUserId);
-
     setActionLoading(true);
     try {
       const result = await dispatch(
@@ -181,8 +193,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
           approverUserId: approverUserId,
         }) as any
       ).unwrap();
-
-      console.log("✅ Approval response:", result);
 
       dispatch(updateBookingStatus({
         id: booking.id,
@@ -194,7 +204,7 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
 
       await dispatch(fetchBookings() as any);
     } catch (err: any) {
-      console.error("❌ Approval error:", err);
+      console.error("Approval error:", err);
       alert(err?.message || err?.error || "Failed to approve booking");
     } finally {
       setActionLoading(false);
@@ -206,21 +216,15 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
       alert("Please provide a rejection reason");
       return;
     }
-
-    console.log("🔐 Rejecting booking:", booking.id, "with approverUserId (from JWT):", approverUserId);
-
     setActionLoading(true);
     try {
       const result = await dispatch(
         rejectBookingAPI({
           bookingId: booking.id,
-          approverUserId: approverUserId,  // ✅ JWT se decoded UUID
+          approverUserId: approverUserId,
           reason: rejectReason,
         }) as any
       ).unwrap();
-
-      console.log("✅ Rejection response:", result);
-
       dispatch(updateBookingStatus({
         id: booking.id,
         status: "REJECTED"
@@ -233,7 +237,7 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
 
       await dispatch(fetchBookings() as any);
     } catch (err: any) {
-      console.error("❌ Rejection error:", err);
+      console.error("Rejection error:", err);
       alert(err?.message || err?.error || "Failed to reject booking");
     } finally {
       setActionLoading(false);
@@ -297,10 +301,10 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
     },
     {
       key: "createdAt",
-      label: "Created",
+      label: "Created At",
       render: (v: string) => (
         <span className="text-sm text-rotary-darkgray">
-          {v ? new Date(v).toLocaleDateString() : "N/A"}
+          {formatCreatedAt(v)}
         </span>
       ),
     },
@@ -323,8 +327,6 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
     { key: "PAID", label: "Confirmed" },
     { key: "CANCELLED", label: "Cancelled" },
   ];
-
-  const approvedTime = detail ? getApprovedActionTime(detail.approvals) : null;
 
   const content = (
     <>
@@ -407,6 +409,12 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
                   {getStatusLabel(detail.status)}
                 </Badge>
               </div>
+              <div className="col-span-2">
+                <p className="text-xs text-rotary-darkgray">Created At</p>
+                <p className="text-sm font-medium">
+                  {formatCreatedAt(detail.createdAt)}
+                </p>
+              </div>
             </div>
 
             {detail.approvals && detail.approvals.length > 0 && (
@@ -441,11 +449,11 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
                           {approval.status}
                         </Badge>
                       </div>
-                      {approval.actionTime && (
-                        <p className="text-xs text-gray-600 mt-1">
-                          {new Date(approval.actionTime).toLocaleString()}
-                        </p>
-                      )}
+                      <p className="text-xs text-gray-600 mt-1">
+                        {approval.actionTime 
+                          ? formatCreatedAt(approval.actionTime)
+                          : "Pending action"}
+                      </p>
                       {approval.remarks && (
                         <p className="text-xs text-gray-600 mt-1">
                           Remarks: {approval.remarks}
@@ -569,11 +577,9 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
               <div className="p-3 rounded-lg bg-green-50 border border-green-200">
                 <p className="text-sm text-green-800">
                   ✓ This booking has been approved
-                  {approvedTime && (
-                    <span className="block text-xs mt-1">
-                      on {new Date(approvedTime).toLocaleString()}
-                    </span>
-                  )}
+                  <span className="block text-xs mt-1">
+                    Created on {formatCreatedAt(detail.createdAt)}
+                  </span>
                 </p>
               </div>
             )}
@@ -595,6 +601,9 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
               <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
                 <p className="text-sm text-gray-800">
                   ⊘ This booking has been cancelled
+                  <span className="block text-xs mt-1">
+                    Created on {formatCreatedAt(detail.createdAt)}
+                  </span>
                 </p>
               </div>
             )}

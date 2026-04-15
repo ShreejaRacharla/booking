@@ -194,7 +194,6 @@ const slotSlice = createSlice({
       state.error = action.error.message || "Failed to fetch availability";
     });
 
-    // Generate
     builder.addCase(generateAvailabilityAPI.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -214,7 +213,6 @@ const slotSlice = createSlice({
       state.error = action.error.message || "Failed to generate availability";
     });
 
-    // Block
     builder.addCase(blockAvailabilityAPI.fulfilled, (state, action) => {
       const { slots, reason } = action.payload as {
         slots: { date: string; slotId: string }[];
@@ -231,7 +229,6 @@ const slotSlice = createSlice({
       });
     });
 
-    // Unblock
     builder.addCase(unblockAvailabilityAPI.fulfilled, (state, action) => {
       const { slots } = action.payload as {
         slots: { date: string; slotId: string }[];

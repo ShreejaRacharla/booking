@@ -59,6 +59,60 @@ const getUserIdFromToken = (): string | null => {
   return decoded?.id || decoded?.userId || decoded?.sub || null;
 };
 
+function parseEventDate(eventDate: any): string {
+  if (!eventDate) return "N/A";
+
+  if (Array.isArray(eventDate)) {
+    const [year, month, day] = eventDate;
+    return new Date(year, month - 1, day).toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  if (typeof eventDate === "string") {
+    return new Date(eventDate + "T00:00:00").toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  return "N/A";
+}
+
+function formatCreatedDate(dateString: string): string {
+  if (!dateString) return "—";
+
+  if (dateString.includes('-') && dateString.includes(':')) {
+    try {
+      const parts = dateString.split(' ');
+      const datePart = parts[0]; 
+      const [day, month, year] = datePart.split('-');
+      
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).toLocaleDateString("en-IN", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch (e) {
+      console.error('Error parsing date:', e);
+      return dateString;
+    }
+  }
+
+  try {
+    return new Date(dateString).toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch (e) {
+    return dateString;
+  }
+}
+
 interface Column {
   key: string;
   label: string;
@@ -102,6 +156,12 @@ const STATUS_CONFIG: Record<string, {
     color: "text-emerald-500"
   },
   CONFIRMED_FULL: {
+    variant: "active",
+    label: "Confirmed",
+    icon: CheckCircle2,
+    color: "text-emerald-500"
+  },
+  CONFIRMED: {
     variant: "active",
     label: "Confirmed",
     icon: CheckCircle2,
@@ -162,7 +222,6 @@ export default function MyBookingsPage() {
   useEffect(() => {
     const id = getUserIdFromToken();
     setUserId(id);
-    console.log('User ID from token:', id);
   }, []);
 
   useEffect(() => {
@@ -228,7 +287,7 @@ export default function MyBookingsPage() {
             {v || row.id?.slice(0, 8)}
           </span>
           <div className="text-xs text-gray-400 mt-0.5">
-            {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}
+            {formatCreatedDate(row.createdAt)}
           </div>
         </div>
       ),
@@ -248,7 +307,7 @@ export default function MyBookingsPage() {
             <div className="text-xs text-gray-400 flex items-center gap-2 mt-1">
               <span className="flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
-                {first.eventDate || "N/A"}
+                {parseEventDate(first.eventDate)}
               </span>
             </div>
             {items.length > 1 && (
@@ -366,9 +425,6 @@ export default function MyBookingsPage() {
           </div>
           <div>
             <p className="text-sm font-medium text-black">{user?.name || "User"}</p>
-            {/* <p className="text-xs text-gray-400 font-mono">
-              {userId || user?.id || "Loading..."}
-            </p> */}
           </div>
         </div>
         <div className="flex items-center gap-6">
@@ -424,7 +480,6 @@ export default function MyBookingsPage() {
       <Card padding={false}>
         {loading && !refreshing ? (
           <div className="flex flex-col items-center justify-center py-16">
-            {/* <Loader2 className="w-8 h-8 text-rotary-royal animate-spin mb-4" /> */}
             <Loader />
           </div>
         ) : sortedBookings.length === 0 ? (

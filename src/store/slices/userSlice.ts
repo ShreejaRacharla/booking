@@ -26,10 +26,7 @@ export const fetchUsers = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const res = await customAxios.get("/users");
-      console.log("🔍 Raw Users API Response:", res.data);
-
       let rawUsers: any[] = [];
-
       if (Array.isArray(res.data)) {
         rawUsers = res.data;
       } else if (res.data?.data && Array.isArray(res.data.data)) {
@@ -43,13 +40,6 @@ export const fetchUsers = createAsyncThunk(
       const users: User[] = rawUsers.map((u: any) => {
         const userId = u.id || u.userId || u.uuid || u.uid || "";
         const userName = u.username || u.name || u.firstName || "";
-
-        console.log(`📦 Mapping user:`, {
-          raw: u,
-          mappedId: userId,
-          mappedName: userName,
-        });
-
         return {
           id: userId,
           name: userName,
@@ -58,11 +48,9 @@ export const fetchUsers = createAsyncThunk(
           isActive: u.enabled !== undefined ? u.enabled : u.isActive,
         };
       });
-
-      console.log("✅ Mapped Users:", users);
       return users;
     } catch (err: any) {
-      console.error("❌ Error fetching users:", err);
+      console.error("Error fetching users:", err);
       return rejectWithValue(err?.message || "Failed to fetch users");
     }
   }
@@ -80,12 +68,11 @@ const userSlice = createSlice({
     builder.addCase(fetchUsers.fulfilled, (state, action) => {
       state.loading = false;
       state.items = action.payload;
-      console.log("✅ Users stored in Redux:", state.items);
     });
     builder.addCase(fetchUsers.rejected, (state, action: any) => {
       state.loading = false;
       state.error = action.payload;
-      console.error("❌ Users fetch failed:", action.payload);
+      console.error("Users fetch failed:", action.payload);
     });
   },
 });

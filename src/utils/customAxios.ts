@@ -8,8 +8,6 @@ if (!API_BASE_URL) {
   console.error("NEXT_PUBLIC_API_BASE_URL is not defined in .env.local");
 }
 
-console.log("API Base URL:", API_BASE_URL);
-
 const customAxios = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -26,35 +24,27 @@ const generateIdempotencyKey = (): string => {
 customAxios.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const fullUrl = `${config.baseURL}${config.url}`;
-    console.log(`[${config.method?.toUpperCase()}] ${fullUrl}`);
 
     if (typeof window !== "undefined") {
       const accessToken = Cookies.get("accessToken");
       if (accessToken) {
         config.headers.Authorization = `Bearer ${accessToken}`;
-        console.log("✅ Authorization token added");
       }
     }
 
     const idempotencyKey = generateIdempotencyKey();
     config.headers["Idempotency-Key"] = idempotencyKey;
-    console.log(`🔑 Idempotency-Key: ${idempotencyKey}`);
 
     return config;
   },
   (error) => {
-    console.error("❌ Request Error:", error);
+    console.error("Request Error:", error);
     return Promise.reject(error);
   }
 );
 
 customAxios.interceptors.response.use(
   (response) => {
-    console.log(
-      `✅ [${response.status}] ${response.config.method?.toUpperCase()} ${
-        response.config.url
-      }`
-    );
     return response;
   },
   async (error: AxiosError) => {
@@ -73,10 +63,10 @@ customAxios.interceptors.response.use(
       data: error.response?.data,
     };
 
-    console.error("❌ API Error:", errorDetails);
+    console.error("API Error:", errorDetails);
 
     if (error.code === "ERR_NETWORK" || error.message === "Network Error") {
-      console.error("🌐 NETWORK ERROR - Check your connection");
+      console.error("NETWORK ERROR - Check your connection");
       return Promise.reject(error);
     }
 
@@ -94,8 +84,6 @@ customAxios.interceptors.response.use(
           throw new Error("No refresh token available");
         }
 
-        console.log("🔄 Attempting to refresh access token...");
-
         const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
           refreshToken,
         });
@@ -105,7 +93,7 @@ customAxios.interceptors.response.use(
         Cookies.set("accessToken", newAccessToken, {
           path: "/",
           secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
+          sameSite: "strict",
           expires: 7,
         });
 
@@ -113,15 +101,9 @@ customAxios.interceptors.response.use(
 
         const newIdempotencyKey = generateIdempotencyKey();
         originalRequest.headers["Idempotency-Key"] = newIdempotencyKey;
-        console.log(`🔑 New Idempotency-Key for retry: ${newIdempotencyKey}`);
-
-        console.log("✅ Token refreshed successfully, retrying request...");
-
         return customAxios(originalRequest);
       } catch (refreshError: any) {
-        console.error("❌ Token refresh failed:", refreshError.message);
-
-        console.log("🔒 Clearing auth data and redirecting to login...");
+        console.error("Token refresh failed:", refreshError.message);
 
         const authCookies = [
           "accessToken",
@@ -148,19 +130,19 @@ customAxios.interceptors.response.use(
     }
 
     if (error.response?.status === 403) {
-      console.error("🚫 Access Forbidden - You don't have permission");
+      console.error("Access Forbidden - You don't have permission");
     }
 
     if (error.response?.status === 404) {
-      console.error("🔍 Resource Not Found");
+      console.error("Resource Not Found");
     }
 
     if (error.response?.status === 500) {
-      console.error("💥 Internal Server Error");
+      console.error("Internal Server Error");
     }
 
     if (error.response?.status === 428) {
-      console.error("⚠️ Precondition Required - Idempotency-Key is required");
+      console.error("Precondition Required - Idempotency-Key is required");
     }
 
     return Promise.reject(error);

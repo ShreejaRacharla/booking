@@ -7,7 +7,6 @@ export default function LandingPage() {
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault()
-        console.log('Searching for:', searchQuery)
     }
 
     return (

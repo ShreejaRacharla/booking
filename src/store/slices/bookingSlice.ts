@@ -38,13 +38,13 @@ function getUserIdFromToken(): string | null {
     const token = Cookies.get("accessToken");
 
     if (!token) {
-      console.warn("⚠️ No accessToken found in cookies");
+      console.warn("No accessToken found in cookies");
       return null;
     }
 
     const base64Url = token.split(".")[1];
     if (!base64Url) {
-      console.error("❌ Invalid token format");
+      console.error("Invalid token format");
       return null;
     }
 
@@ -57,22 +57,19 @@ function getUserIdFromToken(): string | null {
     );
 
     const decoded = JSON.parse(jsonPayload);
-    console.log("🔓 Decoded JWT:", decoded);
-
     const userId = decoded.id || decoded.userId || decoded.user_id || null;
 
     if (userId) {
-      console.log(`✅ Got userId from token: ${userId}`);
       return userId;
     }
 
     console.error(
-      "❌ No userId field found in token. Available fields:",
+      "No userId field found in token. Available fields:",
       Object.keys(decoded)
     );
     return null;
   } catch (error) {
-    console.error("❌ Error decoding token:", error);
+    console.error("Error decoding token:", error);
     return null;
   }
 }
@@ -113,35 +110,26 @@ export const fetchMyBookings = createAsyncThunk(
       const userId = getUserIdFromToken();
 
       if (!userId) {
-        console.error("❌ Could not get userId from token");
+        console.error("Could not get userId from token");
         return rejectWithValue("Unable to get user ID from token");
       }
 
       const res = await getBookings();
       const allBookings = normaliseList(res.data);
-
-      console.log(`📊 Total bookings fetched: ${allBookings.length}`);
-      console.log(`🔍 Filtering for userId: ${userId}`);
-
       const userBookings = allBookings.filter(
         (booking: Booking) => booking.userId === userId
       );
 
-      console.log(`✅ Found ${userBookings.length} bookings for current user`);
-
       if (userBookings.length > 0) {
-        console.log("📋 User's bookings summary:");
         userBookings.slice(0, 5).forEach((b: Booking) => {
-          console.log(`  📌 ${b.bookingCode} | ${b.status} | ₹${b.totalAmount}`);
         });
         if (userBookings.length > 5) {
-          console.log(`  ... and ${userBookings.length - 5} more`);
         }
       }
 
       return userBookings;
     } catch (err: any) {
-      console.error("❌ Error in fetchMyBookings:", err);
+      console.error("Error in fetchMyBookings:", err);
       return rejectWithValue(
         err?.response?.data?.message || err?.message || "Failed to fetch bookings"
       );
@@ -222,14 +210,14 @@ export const submitBookingAPI = createAsyncThunk(
 );
 
 export const cancelBookingAPI = createAsyncThunk(
-  "bookings/cancel",
-  async (bookingId: string, { rejectWithValue }) => {
+  "bookings/cancelBooking",
+  async ({ id, reason }: { id: string; reason: string }, { rejectWithValue }) => {
     try {
-      const res = await cancelBooking(bookingId);
-      return res.data;
-    } catch (err: any) {
+      const response = await cancelBooking(id, reason);
+      return response.data;
+    } catch (error: any) {
       return rejectWithValue(
-        err?.response?.data?.message || err?.message || "Failed to cancel"
+        error.response?.data?.message || "Failed to cancel booking"
       );
     }
   }

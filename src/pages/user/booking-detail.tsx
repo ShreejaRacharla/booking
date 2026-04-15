@@ -8,6 +8,7 @@ import {
   cancelBookingAPI,
   generatePaymentLinkAPI,
 } from "../../store/slices/bookingSlice";
+import { fetchFacilities } from "../../store/slices/facilitySlice";
 import { BookingStatus } from "../../types";
 import {
   Layout,
@@ -16,6 +17,7 @@ import {
   Button,
   Badge,
   Modal,
+  Input,
 } from "../../components";
 import {
   Loader2,
@@ -41,6 +43,7 @@ const STATUS_COLORS: Record<string, string> = {
   REJECTED: "bg-red-500",
   PAID: "bg-blue-500",
   CANCELLED: "bg-gray-600",
+  CONFIRMED: "bg-blue-500",
 };
 
 const STATUS_ICONS: Record<string, any> = {
@@ -54,6 +57,7 @@ const STATUS_ICONS: Record<string, any> = {
   REJECTED: XCircle,
   PAID: CheckCircle,
   CANCELLED: XCircle,
+  CONFIRMED: CheckCircle,
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -67,7 +71,31 @@ const STATUS_LABELS: Record<string, string> = {
   REJECTED: "Rejected",
   PAID: "Paid",
   CANCELLED: "Cancelled",
+  CONFIRMED: "Confirmed",
 };
+
+function parseEventDate(eventDate: any): string {
+  if (!eventDate) return "N/A";
+
+  if (Array.isArray(eventDate)) {
+    const [year, month, day] = eventDate;
+    return new Date(year, month - 1, day).toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  if (typeof eventDate === "string") {
+    return new Date(eventDate + "T00:00:00").toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  return "N/A";
+}
 
 export default function BookingDetailPage() {
   const dispatch = useDispatch();
@@ -80,13 +108,22 @@ export default function BookingDetailPage() {
     (s: RootState) => s.bookings
   );
   const user = useSelector((s: RootState) => s.auth.user);
+  const facilities = useSelector((s: RootState) => s.facilities.items);
+
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [generatingPayment, setGeneratingPayment] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [facilityNames, setFacilityNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!facilities.length) {
+      dispatch(fetchFacilities() as any);
+    }
+  }, [dispatch, facilities.length]);
 
   useEffect(() => {
     if (isReady && id) {
-      console.log("🔍 Fetching booking:", id);
       dispatch(fetchBookingById(id) as any);
     }
 
@@ -96,14 +133,21 @@ export default function BookingDetailPage() {
   }, [isReady, id, dispatch]);
 
   useEffect(() => {
-    console.log("=== DEBUG ===");
-    console.log("Router ready:", isReady);
-    console.log("Query:", query);
-    console.log("ID:", id);
-    console.log("Loading:", loading);
+    if (currentBooking?.items && facilities.length > 0) {
+      const names: Record<string, string> = {};
+      currentBooking.items.forEach((item) => {
+        const facility = facilities.find((f) => f.id === item.facilityId);
+        if (facility) {
+          names[item.facilityId] = facility.name;
+        }
+      });
+      setFacilityNames(names);
+    }
+  }, [currentBooking, facilities]);
+
+  useEffect(() => {
     console.log("Error:", error);
-    console.log("Current Booking:", currentBooking);
-  }, [isReady, query, id, loading, error, currentBooking]);
+  }, [isReady, query, id, loading, error, currentBooking, facilityNames]);
 
   if (!isReady) {
     return (
@@ -122,7 +166,7 @@ export default function BookingDetailPage() {
         <div className="flex flex-col items-center justify-center h-96 gap-3">
           <AlertCircle className="w-12 h-12 text-rotary-darkgray" />
           <p className="text-rotary-darkgray">No booking ID provided</p>
-          <Button onClick={() => router.push("/user/booking")}>
+          <Button onClick={() => router.push("/user/booking-status")}>
             ← Back to My Bookings
           </Button>
         </div>
@@ -134,7 +178,6 @@ export default function BookingDetailPage() {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-96 gap-3">
-          {/* <Loader2 className="w-8 h-8 text-rotary-royal animate-spin" /> */}
           <Loader />
         </div>
       </Layout>
@@ -147,7 +190,7 @@ export default function BookingDetailPage() {
         <div className="flex flex-col items-center justify-center h-96 gap-3">
           <XCircle className="w-12 h-12 text-red-500" />
           <p className="text-red-600 font-medium">{error}</p>
-          <Button onClick={() => router.push("/user/booking")}>
+          <Button onClick={() => router.push("/user/booking-status")}>
             ← Back to My Bookings
           </Button>
         </div>
@@ -166,7 +209,7 @@ export default function BookingDetailPage() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Retry
           </Button>
-          <Button variant="ghost" onClick={() => router.push("/user/booking")}>
+          <Button variant="ghost" onClick={() => router.push("/user/booking-status")}>
             ← Back to My Bookings
           </Button>
         </div>
@@ -186,11 +229,18 @@ export default function BookingDetailPage() {
 
   const handleCancel = async () => {
     if (!id) return;
+
+    if (!cancelReason.trim()) {
+      alert("Please provide a reason for cancellation");
+      return;
+    }
+
     setCancelling(true);
     try {
-      await dispatch(cancelBookingAPI(id) as any).unwrap();
+      await dispatch(cancelBookingAPI({ id, reason: cancelReason.trim() }) as any).unwrap();
       alert("Booking cancelled successfully");
       setCancelModalOpen(false);
+      setCancelReason("");
       dispatch(fetchBookingById(id) as any);
     } catch (err: any) {
       alert(err?.message || "Failed to cancel booking");
@@ -253,7 +303,7 @@ export default function BookingDetailPage() {
                   icon={<CheckCircle className="w-4 h-4 text-green-500" />}
                   color="bg-green-500/10"
                   label="Approved"
-                  time={approvedApproval.actionTime || undefined}
+                  time={currentBooking.createdAt}
                   sub={
                     approvedApproval.approverUserId
                       ? `Approver: ${approvedApproval.approverUserId.slice(0, 8)}`
@@ -267,7 +317,7 @@ export default function BookingDetailPage() {
                   icon={<XCircle className="w-4 h-4 text-red-500" />}
                   color="bg-red-500/10"
                   label="Rejected"
-                  time={rejectedApproval.actionTime || undefined}
+                  time={currentBooking.createdAt}
                   sub={rejectedApproval.remarks || "No reason provided"}
                   subClass="text-red-600"
                 />
@@ -291,58 +341,63 @@ export default function BookingDetailPage() {
               <p className="text-sm text-rotary-darkgray">No slots found.</p>
             ) : (
               <div className="space-y-3">
-                {currentBooking.items.map((item, idx) => (
-                  <div
-                    key={item.id ?? idx}
-                    className="border border-gray-200 rounded-lg p-4"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="font-medium text-rotary-black">
-                          {item.facilityName || `Facility ${item.facilityId?.slice(0, 8)}`}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-rotary-darkgray">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            {item.eventDate
-                              ? new Date(item.eventDate + "T00:00:00").toLocaleDateString()
-                              : "N/A"}
-                          </span>
-                          {(item.startTime || item.endTime) && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {item.startTime?.slice(0, 5) ?? "?"} –{" "}
-                              {item.endTime?.slice(0, 5) ?? "?"}
-                            </span>
-                          )}
-                          {item.slotName && (
-                            <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
-                              {item.slotName}
-                            </span>
-                          )}
-                        </div>
-                        {item.status && (
-                          <div className="mt-2">
-                            <Badge
-                              variant={
-                                item.status === "APPROVED" || item.status === "CONFIRMED_FULL"
-                                  ? "active"
-                                  : item.status === "PENDING" || item.status === "PENDING_APPROVAL"
-                                    ? "pending"
-                                    : "inactive"
-                              }
-                            >
-                              {item.status}
-                            </Badge>
+                {currentBooking.items.map((item, idx) => {
+                  const facilityName = facilityNames[item.facilityId] ||
+                    item.facilityName ||
+                    `Facility ${item.facilityId?.slice(0, 8)}`;
+
+                  return (
+                    <div
+                      key={item.id ?? idx}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-rotary-black">
+                            {facilityName}
                           </div>
-                        )}
-                      </div>
-                      <div className="text-lg font-bold text-rotary-royal ml-4">
-                        ₹{item.price != null ? item.price.toLocaleString("en-IN") : "—"}
+                          <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-rotary-darkgray">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-4 h-4" />
+                              {parseEventDate(item.eventDate)}
+                            </span>
+                            {(item.startTime || item.endTime) && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-4 h-4" />
+                                {item.startTime?.slice(0, 5) ?? "?"} –{" "}
+                                {item.endTime?.slice(0, 5) ?? "?"}
+                              </span>
+                            )}
+                            {item.slotName && (
+                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
+                                {item.slotName}
+                              </span>
+                            )}
+                          </div>
+                          {item.status && (
+                            <div className="mt-2">
+                              <Badge
+                                variant={
+                                  item.status === "APPROVED" ||
+                                    item.status === "CONFIRMED_FULL"
+                                    ? "active"
+                                    : item.status === "PENDING" || item.status === "PENDING_APPROVAL"
+                                      ? "pending"
+                                      : "inactive"
+                                }
+                              >
+                                {item.status}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-lg font-bold text-rotary-royal ml-4">
+                          ₹{item.price != null ? item.price.toLocaleString("en-IN") : "—"}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>
@@ -467,7 +522,10 @@ export default function BookingDetailPage() {
                 <Button
                   fullWidth
                   variant="danger"
-                  onClick={() => setCancelModalOpen(true)}
+                  onClick={() => {
+                    setCancelReason("");
+                    setCancelModalOpen(true);
+                  }}
                 >
                   Cancel Booking
                 </Button>
@@ -476,7 +534,7 @@ export default function BookingDetailPage() {
               <Button
                 fullWidth
                 variant="ghost"
-                onClick={() => router.push("/user/booking")}
+                onClick={() => router.push("/user/booking-status")}
               >
                 ← Back to My Bookings
               </Button>
@@ -491,17 +549,25 @@ export default function BookingDetailPage() {
         title="Cancel Booking"
         size="sm"
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           <p className="text-sm text-rotary-darkgray">
-            Are you sure you want to cancel this booking? This action cannot be
-            undone.
+            Please provide a reason for cancelling this booking.
           </p>
+
+          <Input
+            label="Cancellation Reason"
+            placeholder="e.g., Plans changed, Found another venue"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            disabled={cancelling}
+          />
+
           <div className="flex gap-3 pt-4 border-t border-gray-100">
             <Button
               variant="danger"
               fullWidth
               onClick={handleCancel}
-              disabled={cancelling}
+              disabled={cancelling || !cancelReason.trim()}
             >
               {cancelling ? (
                 <>
@@ -509,16 +575,19 @@ export default function BookingDetailPage() {
                   Cancelling…
                 </>
               ) : (
-                "Yes, Cancel Booking"
+                "Confirm Cancellation"
               )}
             </Button>
             <Button
               variant="ghost"
               fullWidth
-              onClick={() => setCancelModalOpen(false)}
+              onClick={() => {
+                setCancelModalOpen(false);
+                setCancelReason("");
+              }}
               disabled={cancelling}
             >
-              No, Keep It
+              Keep Booking
             </Button>
           </div>
         </div>
@@ -553,7 +622,7 @@ function TimelineStep({
         <div className="font-medium text-sm">{label}</div>
         {time && (
           <div className="text-xs text-rotary-darkgray">
-            {new Date(time).toLocaleString()}
+            {time}
           </div>
         )}
         {sub && <div className={`text-xs mt-0.5 ${subClass}`}>{sub}</div>}

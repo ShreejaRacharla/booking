@@ -21,7 +21,7 @@ import {
 import { Loader2, Calendar, Clock, Plus, Trash2, Check, Save, Loader } from "lucide-react";
 import { BookingItem } from "../../types";
 import Cookies from "js-cookie";
-import axios from "axios";
+import customAxios from "@/utils/customAxios";
 
 interface AvailableSlot {
   id: string;
@@ -85,7 +85,6 @@ async function getUserIdFromToken(): Promise<string | null> {
       return null;
     }
 
-    console.log("🔑 Decoded token:", decoded);
     if (decoded.exp && decoded.exp * 1000 < Date.now()) {
       console.error("Token has expired");
       return null;
@@ -94,7 +93,6 @@ async function getUserIdFromToken(): Promise<string | null> {
     const directUserId = decoded.id || decoded.userId || decoded.sub || decoded.user_id;
 
     if (directUserId) {
-      console.log("User ID found directly in token:", directUserId);
       return directUserId;
     }
 
@@ -105,10 +103,8 @@ async function getUserIdFromToken(): Promise<string | null> {
       return null;
     }
 
-    console.log("🔍 Fetching user ID for username:", username);
-
-    const response = await axios.get(
-      `${process.env.NEXT_PUBLIC_API_BASE_URL}/v1/users/by-username/${username}`,
+    const response = await customAxios.get(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/users/by-username/${username}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -123,7 +119,6 @@ async function getUserIdFromToken(): Promise<string | null> {
       return null;
     }
 
-    console.log("User ID fetched from API:", userId);
     return userId;
 
   } catch (error: any) {
@@ -273,17 +268,12 @@ export default function CreateBookingPage() {
         return;
       }
 
-      console.log("Availability API Response:", response.data);
-      console.log("Timeslots in store:", timeslots);
-      console.log("Target date:", selectedDate);
-
       const parsed = parseAvailabilityResponse(
         response.data,
         selectedDate,
         timeslots
       );
 
-      console.log("Parsed slots:", parsed);
       setAvailableSlots(parsed);
     } catch (err: any) {
       console.error("Availability fetch error:", err);
@@ -371,13 +361,9 @@ export default function CreateBookingPage() {
         })),
       };
 
-      console.log("Saving draft:", JSON.stringify(draftPayload, null, 2));
-
       const draft = await dispatch(
         createBookingDraftAPI(draftPayload) as any
       ).unwrap();
-
-      console.log("Draft saved:", draft);
 
       const draftId = draft?.id ?? draft?.data?.id;
       if (!draftId) throw new Error("Draft created but no ID returned");
@@ -402,10 +388,7 @@ export default function CreateBookingPage() {
 
     setSubmitting(true);
     try {
-      console.log("📤 Submitting booking:", draftBookingId);
       await dispatch(submitBookingAPI(draftBookingId) as any).unwrap();
-
-      console.log("Booking submitted");
       alert("Booking submitted successfully!");
       router.push("/user/booking");
     } catch (err: any) {

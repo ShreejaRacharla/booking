@@ -18,7 +18,6 @@ import {
 
 const ADMIN_NAV_LINKS = [
   { label: "Dashboard", href: "/admin/dashboard", icon: Home },
-  // { label: "Users", href: "/admin/users", icon: Users },
   { label: "Management", href: "/management", icon: BarChart3 },
 ]
 
@@ -26,7 +25,6 @@ const USER_NAV_LINKS = [
   { label: "Dashboard", href: "/user/dashboard", icon: Home },
   { label: "Book Now", href: "/user/booking", icon: Calendar },
   { label: "My Bookings", href: "/user/booking-status", icon: FileText },
-  // { label: "Payments", href: "/user/payment", icon: CreditCard },
 ]
 
 const AUTH_COOKIES = [
@@ -45,7 +43,9 @@ const AUTH_COOKIES = [
   "userId",
   "userRole",
   "isLoggedIn",
-  "authSession"
+  "authSession",
+  "dashboard-layout-admin",
+  "dashboard-layout-user"
 ]
 
 const clearAllCookies = () => {
@@ -79,20 +79,6 @@ const clearAllCookies = () => {
   })
 }
 
-const clearAllStorage = () => {
-  try {
-    localStorage.clear()
-  } catch (e) {
-    console.error("Error clearing localStorage:", e)
-  }
-
-  try {
-    sessionStorage.clear()
-  } catch (e) {
-    console.error("Error clearing sessionStorage:", e)
-  }
-}
-
 export default function Header() {
   const dispatch = useDispatch<AppDispatch>()
   const router = useRouter()
@@ -103,32 +89,28 @@ export default function Header() {
   const NAV_LINKS = isAdmin ? ADMIN_NAV_LINKS : USER_NAV_LINKS
 
   const handleLogout = async () => {
-    try {
+    try {      
       dispatch(logout())
       clearAllCookies()
-      clearAllStorage()
-
+      
       await new Promise(resolve => setTimeout(resolve, 100))
-
-      window.location.href = "/login"
-
+      window.location.href = "/"
     } catch (error) {
       console.error("Logout error:", error)
-      window.location.href = "/login"
+      window.location.href = "/"
     }
   }
 
   const isActive = (href: string) => {
-  if (href === "/" || href === "/user/dashboard" || href === "/admin/dashboard") {
-    return pathname === href
+    if (href === "/" || href === "/user/dashboard" || href === "/admin/dashboard") {
+      return pathname === href
+    }
+    
+    if (pathname === href) {
+      return true
+    }
+    return pathname.startsWith(href + '/')
   }
-  
-  if (pathname === href) {
-    return true
-  }
-  
-  return pathname.startsWith(href + '/')
-}
 
   const getRoleBadgeStyle = () => {
     if (isAdmin) {
@@ -145,10 +127,12 @@ export default function Header() {
           className="flex items-center gap-3 cursor-pointer"
           onClick={() => router.push(isAdmin ? '/admin/dashboard' : '/user/dashboard')}
         >
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isAdmin
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+            isAdmin
               ? "bg-gradient-to-br from-amber-500 to-orange-600"
               : "bg-gradient-to-br from-[#01B4E7] to-[#005DAA]"
-            }`}>
+            }`}
+          >
             {isAdmin ? (
               <Shield className="w-5 h-5 text-white" />
             ) : (
@@ -157,10 +141,13 @@ export default function Header() {
           </div>
           <div className="flex flex-col">
             <span className="text-white font-bold text-sm">
-              {isAdmin ? "Admin" : "Booking"} <span className="text-white/50">{isAdmin ? "Panel" : "Service"}</span>
+              {isAdmin ? "Admin" : "Booking"}{" "}
+              <span className="text-white/50">{isAdmin ? "Panel" : "Service"}</span>
             </span>
             {isAdmin && (
-              <span className="text-[10px] text-amber-400/70 font-medium">Management Console</span>
+              <span className="text-[10px] text-amber-400/70 font-medium">
+                Management Console
+              </span>
             )}
           </div>
         </div>
@@ -170,7 +157,8 @@ export default function Header() {
             <button
               key={href}
               onClick={() => router.push(href)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${isActive(href)
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
+                isActive(href)
                   ? isAdmin
                     ? "bg-amber-500/10 text-amber-400"
                     : "bg-[#01B4E7]/10 text-[#01B4E7]"
@@ -199,10 +187,12 @@ export default function Header() {
             </p>
           </div>
 
-          <div className={`w-9 h-9 rounded-full flex items-center justify-center ${isAdmin
+          <div className={`w-9 h-9 rounded-full flex items-center justify-center ${
+            isAdmin
               ? "bg-gradient-to-br from-amber-500 to-orange-600"
               : "bg-gradient-to-br from-[#01B4E7] to-[#005DAA]"
-            }`}>
+            }`}
+          >
             <span className="text-white text-sm font-bold">
               {(user?.name || "U").charAt(0).toUpperCase()}
             </span>
@@ -225,9 +215,9 @@ export default function Header() {
         </div>
       </div>
 
-      {/* For mobile view */}
       {mobileOpen && (
         <div className="lg:hidden border-t border-white/10 px-4 py-3 space-y-1 bg-[#0a0a0f]">
+          
           <div className={`flex items-center gap-2 px-4 py-2 mb-2 rounded-lg ${getRoleBadgeStyle()}`}>
             {isAdmin ? <Shield className="w-4 h-4" /> : <Users className="w-4 h-4" />}
             <span className="font-medium">{isAdmin ? "Admin Mode" : "Member Mode"}</span>
@@ -240,7 +230,8 @@ export default function Header() {
                 router.push(href)
                 setMobileOpen(false)
               }}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${isActive(href)
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors ${
+                isActive(href)
                   ? isAdmin
                     ? "bg-amber-500/10 text-amber-400"
                     : "bg-[#01B4E7]/10 text-[#01B4E7]"

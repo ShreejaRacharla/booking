@@ -162,29 +162,24 @@ const Loader: React.FC<LoaderProps> = ({
       case 'rotary':
         return (
           <div className={`relative ${sizes.container}`}>
-            {/* Outer */}
             <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-rotary-royal animate-spin" />
 
-            {/* Ring 2 */}
             <div
               className="absolute inset-1 rounded-full border-4 border-transparent border-t-rotary-gold animate-spin"
               style={{ animationDirection: 'reverse', animationDuration: '1.2s' }}
             />
 
-            {/* Ring 3 */}
             <div
               className="absolute inset-2 rounded-full border-4 border-transparent border-t-rotary-sky animate-spin"
               style={{ animationDuration: '1.5s' }}
             />
 
-            {/* Ring 4 */}
             <div
               className="absolute inset-3 rounded-full border-4 border-transparent border-t-rotary-cranberry animate-spin"
               style={{ animationDirection: 'reverse', animationDuration: '1.8s' }}
             />
 
-            {/* Center Dot */}
-            <div className="absolute inset-0 flex items-center justify-center">
+\            <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-2 h-2 rounded-full bg-rotary-royal animate-pulse shadow-glow" />
             </div>
           </div>

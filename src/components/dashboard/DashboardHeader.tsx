@@ -113,7 +113,6 @@ export default function DashboardHeader() {
         )}
       </header>
 
-      {/* Page  */}
       <div className="mb-6 px-4 md:px-6 lg:px-8">
         <h1 className="text-3xl font-extrabold tracking-tight text-[#CB4335] uppercase tracking-widest">
           Dashboard Overview

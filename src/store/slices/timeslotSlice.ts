@@ -14,7 +14,6 @@ const initialState: TimeslotState = {
   error: null,
 };
 
-// thunks
 export const fetchTimeslots = createAsyncThunk(
   "timeslots/fetchAll",
   async () => {

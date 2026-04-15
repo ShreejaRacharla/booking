@@ -7,7 +7,7 @@ import AvailabilityPage from "../admin/slot-availability";
 import ApprovalsPage from "../admin/approvals";
 
 const TABS = [
-  { label: "Overview", value: "overview" },
+  // { label: "Overview", value: "overview" },
   { label: "Locations", value: "locations" },
   { label: "Facilities", value: "facilities" },
   { label: "Time Slots", value: "timeslots" },
@@ -17,7 +17,7 @@ const TABS = [
 ];
 
 export default function ManagementPage() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("locations");
 
   return (
     <Layout>

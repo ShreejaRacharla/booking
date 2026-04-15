@@ -11,7 +11,7 @@ import type {
 } from "../types";
 
 export const login = (data: { username: string; password: string }) =>
-  customAxios.post("/login", data);
+  customAxios.post("/auth/login", data);
 
 export const refreshToken = (data: { refreshToken: string }) =>
   customAxios.post("/refresh", data);
@@ -20,7 +20,7 @@ export const logout = (data?: { refreshToken?: string }) =>
   customAxios.post("/logout", data ?? {});
 
 export const getUsers = () => customAxios.get("/users");
-export const getAllUsers = () => customAxios.get("/users/getAll");
+export const getAllUsers = () => customAxios.get("/users");
 export const getUserById = (id: string) => customAxios.get(`/users/${id}`);
 
 export const createUser = (data: {
@@ -124,16 +124,16 @@ export const createMasterData = (data: MasterDataRequest) =>
   customAxios.post("/v1/master-data", data);
 
 export const getAvailability = (params?: AvailabilityQueryParams) => {
-  if (params?.facilityId && params?.fromDate && params?.toDate) {
-    return customAxios.get(`/v1/availability`, {
-      params: {
-        facilityId: params.facilityId,
-        fromDate: params.fromDate,
-        toDate: params.toDate,
-      },
-    });
-  }
-    return customAxios.get(`/v1/availability`);
+  const queryParams = new URLSearchParams();
+  if (params?.locationId) queryParams.append("locationId", params.locationId);
+  if (params?.facilityId) queryParams.append("facilityId", params.facilityId);
+  if (params?.fromDate) queryParams.append("fromDate", params.fromDate);
+  if (params?.toDate) queryParams.append("toDate", params.toDate);
+
+  const queryString = queryParams.toString();
+  return customAxios.get(
+    `/v1/availability${queryString ? `?${queryString}` : ""}`
+  );
 };
 
 export const getAllAvailability = () =>
@@ -179,8 +179,10 @@ export const createBookingDraft = (data: BookingDraftRequest) =>
 export const submitBooking = (bookingId: string) =>
   customAxios.post(`/v1/booking/${bookingId}/submit`);
 
-export const cancelBooking = (bookingId: string) =>
-  customAxios.post(`/v1/booking/${bookingId}/cancel`);
+export const cancelBooking = (bookingId: string, reason: string) =>
+  customAxios.post(`/v1/booking/bookings/${bookingId}/cancel?reason=${encodeURIComponent(reason)}`, {
+    params: { reason },
+  });
 
 export const getPendingApprovals = () => customAxios.get("/v1/approvals");
 

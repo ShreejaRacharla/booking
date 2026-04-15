@@ -37,7 +37,7 @@ const USER_ID_MAP: Record<string, string> = {
   "admin": "e3af12c2-de09-47d1-9d0e-b25a214274f7",
 };
 
-const decodeJWT = (token: string): { sub?: string; roles?: string[]; sessionId?: string } | null => {
+const decodeJWT = (token: string): { sub?: string; roles?: string[]; sessionId?: string; name?: string; email?: string } | null => {
   try {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -54,26 +54,27 @@ const decodeJWT = (token: string): { sub?: string; roles?: string[]; sessionId?:
   }
 };
 
+const getRoleFromToken = (token: string): "admin" | "member" => {
+  const decoded = decodeJWT(token);
+  if (!decoded) return "member";
+
+  const roles = decoded.roles || [];
+  
+  const hasAdminRole = roles.some((role: string) => 
+    role.toUpperCase() === "ADMIN" || role.toUpperCase() === "ROLE_ADMIN"
+  );
+
+  return hasAdminRole ? "admin" : "member";
+};
+
 const clearAuthCookies = () => {
   if (typeof window === "undefined") return;
 
-  console.log("Clearing auth cookies...");
-
   Object.values(COOKIE_NAMES).forEach((cookieName) => {
     Cookies.remove(cookieName, COOKIE_CONFIG);
-  });
-
-  Object.values(COOKIE_NAMES).forEach((cookieName) => {
     Cookies.remove(cookieName, { path: "/" });
     Cookies.remove(cookieName, { path: "" });
     Cookies.remove(cookieName);
-  });
-
-  Object.values(COOKIE_NAMES).forEach((cookieName) => {
-    Cookies.set(cookieName, "", {
-      ...COOKIE_CONFIG,
-      expires: new Date(0),
-    });
   });
 
   const remaining = Object.values(COOKIE_NAMES)
@@ -83,7 +84,6 @@ const clearAuthCookies = () => {
   if (remaining.length > 0) {
     console.warn("Some cookies still exist:", remaining);
   } else {
-    console.log("All auth cookies cleared successfully");
   }
 };
 
@@ -119,98 +119,91 @@ const authSlice = createSlice({
 
       const actualToken = token || accessToken;
 
-      let username = userData.username;
-      let roles = userData.roles || [];
-      
-      if (actualToken) {
-        const decoded = decodeJWT(actualToken);
-        console.log("Decoded JWT:", decoded);
-        
-        if (decoded) {
-          username = username || decoded.sub;
-          roles = roles.length ? roles : (decoded.roles || []);
-        }
+      if (!actualToken) {
+        console.error("No token provided to login action");
+        return;
       }
 
+      const decoded = decodeJWT(actualToken);
+
+      if (!decoded) {
+        console.error("Failed to decode token");
+        return;
+      }
+
+      const username = userData.username || decoded.sub || "unknown";
+      const roles = decoded.roles || [];
+      
       let userId = userData.userId || userData.id;
       
       if (!userId && username) {
         userId = USER_ID_MAP[username];
-        console.log(`📋 Using mapped userId for ${username}: ${userId}`);
       }
 
       if (!userId) {
-        console.warn("⚠️ No userId found! Using username as fallback.");
-        userId = username || "unknown";
+        console.warn("No userId found! Using username as fallback.");
+        userId = username;
       }
 
-      const role = roles.includes("ADMIN") ? "admin" : "member";
+      const role = getRoleFromToken(actualToken);
 
       const user: User = {
         id: userId,
         userId: userId,
-        username: username || "unknown",
-        name: userData.name || username || "User",
-        email: userData.email || "",
-        role: role as "admin" | "member",
-        system: userData.system,
+        username: username,
+        name: userData.name || decoded.name || username.charAt(0).toUpperCase() + username.slice(1),
+        email: userData.email || decoded.email || `${username}@rotaryclub.com`,
+        role: role, 
+        system: userData.system ?? false,
         isActive: userData.isActive ?? true,
         club: userData.club,
         phone: userData.phone,
         roles: roles,
       };
 
-      console.log("✅ Constructed user object:", user);
-
       state.isAuthenticated = true;
       state.user = user;
-      state.accessToken = actualToken || null;
-      state.sessionId = sessionId || null;
+      state.accessToken = actualToken;
+      state.sessionId = sessionId || decoded.sessionId || null;
       state.refreshToken = refreshToken || null;
       state.hydrated = true;
 
       if (typeof window !== "undefined") {
         clearAuthCookies();
 
-        if (actualToken) {
-          Cookies.set(COOKIE_NAMES.ACCESS_TOKEN, actualToken, {
+        Cookies.set(COOKIE_NAMES.ACCESS_TOKEN, actualToken, {
+          ...COOKIE_CONFIG,
+          expires: 7,
+        });
+        
+        if (state.sessionId) {
+          Cookies.set(COOKIE_NAMES.SESSION_ID, state.sessionId, {
             ...COOKIE_CONFIG,
             expires: 7,
           });
         }
-        if (sessionId) {
-          Cookies.set(COOKIE_NAMES.SESSION_ID, sessionId, {
-            ...COOKIE_CONFIG,
-            expires: 7,
-          });
-        }
+        
         if (refreshToken) {
           Cookies.set(COOKIE_NAMES.REFRESH_TOKEN, refreshToken, {
             ...COOKIE_CONFIG,
             expires: 30,
           });
         }
+        
         Cookies.set(COOKIE_NAMES.USER, JSON.stringify(user), {
           ...COOKIE_CONFIG,
           expires: 7,
         });
-
-        console.log("Auth cookies set successfully");
       }
     },
 
     logout(state) {
-      console.log("Logout initiated...");
-
       state.isAuthenticated = false;
       state.user = null;
       state.accessToken = null;
       state.sessionId = null;
       state.refreshToken = null;
-
       clearAuthCookies();
-
-      console.log("Logout complete");
     },
 
     hydrate(state) {
@@ -222,13 +215,21 @@ const authSlice = createSlice({
           const userStr = Cookies.get(COOKIE_NAMES.USER);
 
           if (accessToken && userStr) {
+            const role = getRoleFromToken(accessToken);
+            
             const user = JSON.parse(userStr);
+            
+            user.role = role;
+
             state.isAuthenticated = true;
             state.user = user;
             state.accessToken = accessToken;
             state.sessionId = sessionId || null;
             state.refreshToken = refreshToken || null;
-            console.log("Auth state hydrated from cookies, user:", user);
+            Cookies.set(COOKIE_NAMES.USER, JSON.stringify(user), {
+              ...COOKIE_CONFIG,
+              expires: 7,
+            });
           } else {
             console.log("No valid auth cookies found");
           }
@@ -241,18 +242,33 @@ const authSlice = createSlice({
     },
 
     updateAccessToken(state, action: PayloadAction<string>) {
-      state.accessToken = action.payload;
-      if (typeof window !== "undefined") {
-        Cookies.set(COOKIE_NAMES.ACCESS_TOKEN, action.payload, {
-          ...COOKIE_CONFIG,
-          expires: 7,
-        });
+      const newToken = action.payload;
+      
+      const role = getRoleFromToken(newToken);
+      
+      state.accessToken = newToken;
+      
+      if (state.user) {
+        state.user.role = role;
+        
+        if (typeof window !== "undefined") {
+          Cookies.set(COOKIE_NAMES.ACCESS_TOKEN, newToken, {
+            ...COOKIE_CONFIG,
+            expires: 7,
+          });
+          
+          Cookies.set(COOKIE_NAMES.USER, JSON.stringify(state.user), {
+            ...COOKIE_CONFIG,
+            expires: 7,
+          });
+        }
       }
     },
 
     updateUser(state, action: PayloadAction<Partial<User>>) {
       if (state.user) {
         state.user = { ...state.user, ...action.payload };
+        
         if (typeof window !== "undefined") {
           Cookies.set(COOKIE_NAMES.USER, JSON.stringify(state.user), {
             ...COOKIE_CONFIG,

@@ -138,9 +138,8 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
           toDate: gridFilter.toDate,
         }) as any
       ).unwrap();
-      console.log("Fetched availability from API");
     } catch (err: any) {
-      console.error("❌ Failed to fetch availability:", err);
+      console.error("Failed to fetch availability:", err);
     }
   };
 
@@ -186,9 +185,6 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
           pricePerSlot: Number(genForm.price),
         }) as any
       ).unwrap();
-
-      console.log("Generated availability:", result);
-
       setGridFilter({
         locationId: genForm.locationId,
         facilityId: genForm.facilityId,
@@ -198,7 +194,7 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
 
       alert("Availability generated successfully!");
     } catch (err: any) {
-      console.error("❌ Generation failed:", err);
+      console.error("Generation failed:", err);
       alert(err?.message || "Failed to generate availability");
     } finally {
       setActionLoading(false);
@@ -265,8 +261,6 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
         blockAvailabilityAPI({ facilityId, slots, reason: blockReason }) as any
       ).unwrap();
 
-      console.log("Blocked successfully");
-
       dispatch(
         blockSlots({ ids: Array.from(selectedCells), reason: blockReason })
       );
@@ -274,7 +268,7 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
       setBlockModalOpen(false);
       setBlockReason("");
     } catch (err: any) {
-      console.error("❌ Block failed:", err);
+      console.error("Block failed:", err);
       alert(err?.message || "Failed to block slots");
     } finally {
       setActionLoading(false);
@@ -293,13 +287,10 @@ export default function AvailabilityPage({ embedded = false }: { embedded?: bool
       await dispatch(
         unblockAvailabilityAPI({ facilityId, slots }) as any
       ).unwrap();
-
-      console.log("Unblocked successfully");
-
       dispatch(unblockSlots(Array.from(selectedCells)));
       setSelectedCells(new Set());
     } catch (err: any) {
-      console.error("❌ Unblock failed:", err);
+      console.error("Unblock failed:", err);
       alert(err?.message || "Failed to unblock slots");
     } finally {
       setActionLoading(false);
