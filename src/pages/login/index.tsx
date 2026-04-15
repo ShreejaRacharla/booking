@@ -145,7 +145,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen relative p-4 from-rotary-royal via-rotary-azure to-rotary-royal">
+    <div className="flex items-center justify-center relative p-4 from-rotary-royal via-rotary-azure to-rotary-royal">
       <div className="absolute top-[-10%] left-[-10%] h-[50%] w-[50%] rounded-full bg-rotary-turquoise/20 blur-[120px]" />
       <div className="absolute bottom-[-10%] right-[-10%] h-[50%] w-[50%] rounded-full bg-rotary-gold/20 blur-[120px]" />
 

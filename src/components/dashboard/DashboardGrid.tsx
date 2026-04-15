@@ -442,7 +442,7 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
 
   if (!isMounted || !layoutLoaded || !authLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center">
         <Loader />
       </div>
     )

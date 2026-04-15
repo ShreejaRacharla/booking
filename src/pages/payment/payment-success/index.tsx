@@ -115,7 +115,7 @@ const PaymentSuccessPage = () => {
 
     if (state.status === "loading") {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+            <div className="flex flex-col items-center justify-center gap-4">
                 <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
                 <p className="text-gray-600 text-sm">Verifying your payment…</p>
             </div>
@@ -126,7 +126,7 @@ const PaymentSuccessPage = () => {
         const locationName = bookingDetail?.locationName || bookingDetail?.location?.name;
 
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8">
+            <div className="flex flex-col items-center justify-center px-4 py-8">
                 <div className="bg-white rounded-2xl shadow-lg p-8 max-w-2xl w-full">
                     <div className="text-center mb-6">
                         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -282,7 +282,7 @@ const PaymentSuccessPage = () => {
 
     if (state.status === "cancelled") {
         return (
-            <div className="flex items-center justify-center min-h-screen px-4">
+            <div className="flex items-center justify-center px-4">
                 <div className="bg-white rounded-2xl shadow-md p-8 max-w-md w-full text-center">
                     <div className="mb-6">
                         <div className="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -338,7 +338,7 @@ const PaymentSuccessPage = () => {
     }
 
     return (
-        <div className="flex items-center justify-center min-h-screen px-4">
+        <div className="flex items-center justify-center px-4">
             <div className="bg-white rounded-2xl shadow-md p-8 max-w-md w-full text-center">
                 <div className="mb-6">
                     <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">

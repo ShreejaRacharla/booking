@@ -10,7 +10,7 @@ export default function LandingPage() {
     }
 
     return (
-        <div className="min-h-screen bg-rotary-white relative overflow-hidden flex flex-col">
+        <div className="bg-rotary-white relative overflow-hidden flex flex-col">
             <div className="absolute top-[-5%] left-[-10%] w-[60%] h-[60%] bg-rotary-sky/10 rounded-full blur-[150px] -z-10 pointer-events-none" />
             <div className="absolute top-[20%] right-[-10%] w-[50%] h-[50%] bg-rotary-azure/10 rounded-full blur-[120px] -z-10 pointer-events-none" />
             <div className="absolute bottom-[-10%] left-[30%] w-[40%] h-[40%] bg-rotary-turquoise/5 rounded-full blur-[150px] -z-10 pointer-events-none" />

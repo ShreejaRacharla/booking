@@ -179,7 +179,7 @@ const Loader: React.FC<LoaderProps> = ({
               style={{ animationDirection: 'reverse', animationDuration: '1.8s' }}
             />
 
-\            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-2 h-2 rounded-full bg-rotary-royal animate-pulse shadow-glow" />
             </div>
           </div>

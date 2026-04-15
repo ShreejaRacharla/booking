@@ -404,7 +404,7 @@ export default function CreateBookingPage() {
   if (loadingUser || !userId) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center justify-center">
           <Loader2 className="w-8 h-8 text-rotary-royal animate-spin" />
           <span className="ml-3 text-rotary-darkgray">Authenticating...</span>
         </div>
