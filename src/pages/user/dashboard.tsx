@@ -129,7 +129,7 @@ function formatDate(dateArray: number[] | string | undefined): string {
 function formatTime(timeString: string): string {
   try {
     if (!timeString) return 'N/A';
-     const parts = timeString.split(':');
+    const parts = timeString.split(':');
     if (parts.length >= 2) {
       const hour = parseInt(parts[0]);
       const minute = parts[1];
@@ -181,6 +181,7 @@ export default function DashboardPage() {
         const timeSlots: TimeSlot[] = normalizeArray(timeSlotsRes.data)
         const bookings: Booking[] = normalizeArray(bookingsRes.data)
         const users: User[] = normalizeArray(usersRes.data)
+        
         const myBookings = userId 
           ? bookings.filter((b: Booking) => b.userId === userId)
           : []
@@ -217,47 +218,6 @@ export default function DashboardPage() {
             endTime: '23:59:59'
           }
         }
-
-        const recentBookings: ProcessedBooking[] = [...bookings]
-          .filter((b: Booking) => b.status !== 'DRAFT') 
-          .sort((a: Booking, b: Booking) => (b.createdAt || 0) - (a.createdAt || 0))
-          .slice(0, 5)
-          .map((booking: Booking) => {
-            const facilityIds = booking.items?.map((item: BookingItem) => item.facilityId) || []
-            const uniqueFacilityIds = [...new Set(facilityIds)]
-            const facilityNames = uniqueFacilityIds
-              .map((id: string) => facilities.find((f: Facility) => f.id === id)?.name)
-              .filter((name): name is string => Boolean(name))
-            
-            const firstItem = booking.items?.[0]
-            const eventDate = firstItem?.eventDate
-            const bookingUser = users.find((u: User) => u.id === booking.userId)            
-            const slotDetails: SlotDetail[] = booking.items?.map((item: BookingItem) => {
-              const slot = getSlotDetails(item.slotId)
-              return {
-                ...slot,
-                date: formatDate(item.eventDate)
-              }
-            }) || []
-
-            const timeRanges = [...new Set(slotDetails.map((s: SlotDetail) => 
-              `${formatTime(s.startTime)}-${formatTime(s.endTime)}`
-            ))].join(', ')
-
-            return {
-              id: booking.bookingCode || booking.id,
-              bookingCode: booking.bookingCode,
-              userId: booking.userId,
-              userName: bookingUser?.name || bookingUser?.username || 'Unknown User',
-              facilityName: facilityNames.join(', ') || 'Unknown Facility',
-              date: formatDate(eventDate),
-              status: booking.status,
-              totalAmount: booking.totalAmount || 0,
-              slots: booking.items || [],
-              slotCount: booking.items?.length || 0,
-              timeRanges: timeRanges || 'N/A'
-            }
-          })
 
         const today = new Date()
         today.setHours(0, 0, 0, 0)
@@ -365,7 +325,7 @@ export default function DashboardPage() {
           availableSlots: 0,
           totalUsers: users.length,
           totalRevenue,
-          recentBookings,
+          recentBookings: [],
           myBookings: myBookings.length,
           myPendingBookings,
           myApprovedBookings,
@@ -401,14 +361,14 @@ export default function DashboardPage() {
 
   if (loading || !dashboardData) {
     return (
-      <div className="flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <Loader />
       </div>
     )
   }
 
   return (
-    <div className="animate-fade-in">
+    <div className="min-h-screen bg-background">
       <Header />
       <DashboardGrid initialData={dashboardData} />
     </div>

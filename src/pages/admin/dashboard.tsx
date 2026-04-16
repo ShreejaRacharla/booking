@@ -105,10 +105,12 @@ function normalizeArray(data: any): any[] {
 
 export default function AdminDashboardPage() {
   const [dashboardData, setDashboardData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true)
         const [
           locationsRes,
           facilitiesRes,
@@ -128,6 +130,7 @@ export default function AdminDashboardPage() {
         const timeSlots: TimeSlot[] = normalizeArray(timeSlotsRes.data)
         const bookings: Booking[] = normalizeArray(bookingsRes.data)
         const users: User[] = normalizeArray(usersRes.data)
+        
         const pendingApprovals = bookings.filter((b: Booking) => 
           b.status === 'PENDING_APPROVAL'
         ).length
@@ -216,22 +219,24 @@ export default function AdminDashboardPage() {
           totalRevenue: 0,
           recentBookings: [],
         })
+      } finally {
+        setLoading(false)
       }
     }
 
     fetchData()
   }, [])
 
-  if (!dashboardData) {
+  if (loading || !dashboardData) {
     return (
-      <div className="flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <Loader />
       </div>
     )
   }
 
   return (
-    <div className="animate-fade-in">
+    <div className="min-h-screen bg-background">
       <Header />
       <DashboardGrid initialData={dashboardData} />
     </div>
