@@ -6,7 +6,6 @@ import {
   fetchBookingById,
   clearCurrentBooking,
   cancelBookingAPI,
-  generatePaymentLinkAPI,
 } from "../../store/slices/bookingSlice";
 import { fetchFacilities } from "../../store/slices/facilitySlice";
 import { BookingStatus } from "../../types";
@@ -30,6 +29,12 @@ import {
   ExternalLink,
   RefreshCw,
   Loader,
+  MapPin,
+  IndianRupee,
+  Hash,
+  User,
+  FileText,
+  ChevronLeft,
 } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -74,27 +79,134 @@ const STATUS_LABELS: Record<string, string> = {
   CONFIRMED: "Confirmed",
 };
 
+// ============ FIXED DATE PARSING FUNCTIONS ============
+
 function parseEventDate(eventDate: any): string {
   if (!eventDate) return "N/A";
 
-  if (Array.isArray(eventDate)) {
-    const [year, month, day] = eventDate;
-    return new Date(year, month - 1, day).toLocaleDateString("en-IN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }
+  try {
+    let date: Date;
 
-  if (typeof eventDate === "string") {
-    return new Date(eventDate + "T00:00:00").toLocaleDateString("en-IN", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }
+    // Handle string format: "2026-04-27"
+    if (typeof eventDate === "string") {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+        const [year, month, day] = eventDate.split("-");
+        return `${year}/${month}/${day}`;
+      }
+      // Handle other string formats
+      date = new Date(eventDate);
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}/${month}/${day}`;
+      }
+    }
 
-  return "N/A";
+    // Handle array format: [2026, 4, 27]
+    if (Array.isArray(eventDate)) {
+      if (eventDate.length >= 3) {
+        const year = eventDate[0];
+        const month = String(eventDate[1]).padStart(2, "0");
+        const day = String(eventDate[2]).padStart(2, "0");
+        return `${year}/${month}/${day}`;
+      }
+    }
+
+    // Handle number (timestamp)
+    if (typeof eventDate === "number") {
+      date = new Date(eventDate);
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}/${month}/${day}`;
+      }
+    }
+
+    return "N/A";
+  } catch (error) {
+    console.error("Date parsing error:", error, eventDate);
+    return "N/A";
+  }
+}
+
+function parseCreatedAt(createdAt: any): string {
+  if (!createdAt) return "N/A";
+
+  try {
+    let date: Date;
+
+    // Handle string format: "2026-04-17 16:01 PM"
+    if (typeof createdAt === "string") {
+      // Remove "AM/PM" and clean up the string
+      const cleanedString = createdAt
+        .replace(/\s?(AM|PM)/i, "")
+        .trim();
+
+      // Try parsing as is
+      date = new Date(cleanedString);
+      
+      if (!isNaN(date.getTime())) {
+        return formatDate(date);
+      }
+
+      // Try alternative parsing with regex
+      const match = createdAt.match(
+        /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/
+      );
+      if (match) {
+        const [, year, month, day, hours, minutes] = match;
+        date = new Date(
+          parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hours),
+          parseInt(minutes)
+        );
+        return formatDate(date);
+      }
+    }
+
+    // Handle array format: [2026, 4, 17, 16, 1, 0]
+    if (Array.isArray(createdAt)) {
+      if (createdAt.length >= 6) {
+        const [year, month, day, hour, minute, second] = createdAt;
+        date = new Date(year, month - 1, day, hour, minute, second);
+        return formatDate(date);
+      } else if (createdAt.length >= 3) {
+        const [year, month, day] = createdAt;
+        date = new Date(year, month - 1, day);
+        return formatDate(date);
+      }
+    }
+
+    // Handle number (timestamp)
+    if (typeof createdAt === "number") {
+      date = new Date(createdAt);
+      if (!isNaN(date.getTime())) {
+        return formatDate(date);
+      }
+    }
+
+    return "N/A";
+  } catch (error) {
+    console.error("DateTime parsing error:", error, createdAt);
+    return "N/A";
+  }
+}
+
+// Helper function to format date consistently
+function formatDate(date: Date): string {
+  if (isNaN(date.getTime())) return "N/A";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}/${month}/${day} ${hours}:${minutes}`;
 }
 
 export default function BookingDetailPage() {
@@ -116,22 +228,24 @@ export default function BookingDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [facilityNames, setFacilityNames] = useState<Record<string, string>>({});
 
+  // Fetch facilities if not already loaded
   useEffect(() => {
     if (!facilities.length) {
       dispatch(fetchFacilities() as any);
     }
   }, [dispatch, facilities.length]);
 
+  // Fetch booking details
   useEffect(() => {
     if (isReady && id) {
       dispatch(fetchBookingById(id) as any);
     }
-
     return () => {
       dispatch(clearCurrentBooking());
     };
   }, [isReady, id, dispatch]);
 
+  // Map facility IDs to names
   useEffect(() => {
     if (currentBooking?.items && facilities.length > 0) {
       const names: Record<string, string> = {};
@@ -144,10 +258,6 @@ export default function BookingDetailPage() {
       setFacilityNames(names);
     }
   }, [currentBooking, facilities]);
-
-  useEffect(() => {
-    console.log("Error:", error);
-  }, [isReady, query, id, loading, error, currentBooking, facilityNames]);
 
   if (!isReady) {
     return (
@@ -167,7 +277,8 @@ export default function BookingDetailPage() {
           <AlertCircle className="w-12 h-12 text-rotary-darkgray" />
           <p className="text-rotary-darkgray">No booking ID provided</p>
           <Button onClick={() => router.push("/user/booking-status")}>
-            ← Back to My Bookings
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back to My Bookings
           </Button>
         </div>
       </Layout>
@@ -191,7 +302,8 @@ export default function BookingDetailPage() {
           <XCircle className="w-12 h-12 text-red-500" />
           <p className="text-red-600 font-medium">{error}</p>
           <Button onClick={() => router.push("/user/booking-status")}>
-            ← Back to My Bookings
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back to My Bookings
           </Button>
         </div>
       </Layout>
@@ -209,15 +321,19 @@ export default function BookingDetailPage() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Retry
           </Button>
-          <Button variant="ghost" onClick={() => router.push("/user/booking-status")}>
-            ← Back to My Bookings
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/user/booking-status")}
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back to My Bookings
           </Button>
         </div>
       </Layout>
     );
   }
 
-  const status = (currentBooking.status || "DRAFT") as BookingStatus;
+  const status = (currentBooking.status || "DRAFT") as BookingStatus | "CONFIRMED";
   const StatusIcon = STATUS_ICONS[status] ?? AlertCircle;
   const statusLabel = STATUS_LABELS[status] ?? status;
   const approvedApproval = currentBooking.approvals?.find(
@@ -229,15 +345,15 @@ export default function BookingDetailPage() {
 
   const handleCancel = async () => {
     if (!id) return;
-
     if (!cancelReason.trim()) {
       alert("Please provide a reason for cancellation");
       return;
     }
-
     setCancelling(true);
     try {
-      await dispatch(cancelBookingAPI({ id, reason: cancelReason.trim() }) as any).unwrap();
+      await dispatch(
+        cancelBookingAPI({ id, reason: cancelReason.trim() }) as any
+      ).unwrap();
       alert("Booking cancelled successfully");
       setCancelModalOpen(false);
       setCancelReason("");
@@ -249,52 +365,95 @@ export default function BookingDetailPage() {
     }
   };
 
-  const handleGeneratePaymentLink = async () => {
-    if (!id) return;
-    setGeneratingPayment(true);
-    try {
-      await dispatch(generatePaymentLinkAPI(id) as any).unwrap();
-      alert("Payment link generated!");
-      dispatch(fetchBookingById(id) as any);
-    } catch (err: any) {
-      alert(err?.message || "Failed to generate payment link");
-    } finally {
-      setGeneratingPayment(false);
-    }
+  const canCancel = [
+    "DRAFT",
+    "PENDING",
+    "SUBMITTED",
+    "PENDING_APPROVAL",
+  ].includes(status);
+  const canPay = ["APPROVED", "APPROVED_PENDING_PAYMENT"].includes(status);
+
+  // Calculate date range
+  const getDateRange = () => {
+    if (!currentBooking.items || currentBooking.items.length === 0)
+      return "N/A";
+
+    const sortedItems = [...currentBooking.items].sort(
+      (a, b) => {
+        const dateA = new Date(
+          typeof a.eventDate === "string"
+            ? a.eventDate
+            : Array.isArray(a.eventDate)
+            ? `${a.eventDate[0]}-${String(a.eventDate[1]).padStart(
+                2,
+                "0"
+              )}-${String(a.eventDate[2]).padStart(2, "0")}`
+            : ""
+        ).getTime();
+        const dateB = new Date(
+          typeof b.eventDate === "string"
+            ? b.eventDate
+            : Array.isArray(b.eventDate)
+            ? `${b.eventDate[0]}-${String(b.eventDate[1]).padStart(
+                2,
+                "0"
+              )}-${String(b.eventDate[2]).padStart(2, "0")}`
+            : ""
+        ).getTime();
+        return dateA - dateB;
+      }
+    );
+
+    const startDate = parseEventDate(sortedItems[0].eventDate);
+    if (sortedItems.length === 1) return startDate;
+
+    const endDate = parseEventDate(
+      sortedItems[sortedItems.length - 1].eventDate
+    );
+    return `${startDate} to ${endDate}`;
   };
 
-  const canCancel = ["DRAFT", "PENDING", "SUBMITTED", "PENDING_APPROVAL"].includes(status);
-  const canPay = ["APPROVED", "APPROVED_PENDING_PAYMENT"].includes(status);
+  // Calculate total pax
+  const getTotalPax = () => {
+    if (!currentBooking.items) return 0;
+    return currentBooking.items.reduce((sum, item) => sum + (item.pax || 0), 0);
+  };
 
   return (
     <Layout>
       <PageHeader
-        title={`Booking ${currentBooking.bookingCode || `#${currentBooking.id?.slice(0, 8)}`}`}
+        title={`Booking ${
+          currentBooking.bookingCode || `#${currentBooking.id?.slice(0, 8)}`
+        }`}
         subtitle="View booking details and status"
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
+          {/* Booking Status Timeline */}
           <Card>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-rotary-royal">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-base font-bold text-rotary-royal flex items-center gap-2">
+                <FileText className="w-4 h-4" />
                 Booking Status
               </h3>
               <div
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-sm font-medium ${STATUS_COLORS[status] ?? "bg-gray-500"
-                  }`}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-white text-sm font-medium ${
+                  STATUS_COLORS[status] ?? "bg-gray-500"
+                }`}
               >
                 <StatusIcon className="w-4 h-4" />
                 {statusLabel}
               </div>
             </div>
+
             <div className="space-y-3">
               {currentBooking.createdAt && (
                 <TimelineStep
                   icon={<CheckCircle className="w-4 h-4 text-rotary-royal" />}
                   color="bg-rotary-royal/10"
                   label="Created"
-                  time={currentBooking.createdAt}
+                  time={parseCreatedAt(currentBooking.createdAt)}
                 />
               )}
 
@@ -303,12 +462,13 @@ export default function BookingDetailPage() {
                   icon={<CheckCircle className="w-4 h-4 text-green-500" />}
                   color="bg-green-500/10"
                   label="Approved"
-                  time={currentBooking.createdAt}
-                  sub={
-                    approvedApproval.approverUserId
-                      ? `Approver: ${approvedApproval.approverUserId.slice(0, 8)}`
-                      : undefined
-                  }
+                  time={parseCreatedAt(approvedApproval.actionTime)}
+                  // sub={
+                  //   approvedApproval.approverUserId
+                  //     // ? `Approver: ${approvedApproval.approverUserId.slice(0, 8)}`
+                  //     ? `Approver`
+                  //     : undefined
+                  // }
                 />
               )}
 
@@ -317,7 +477,7 @@ export default function BookingDetailPage() {
                   icon={<XCircle className="w-4 h-4 text-red-500" />}
                   color="bg-red-500/10"
                   label="Rejected"
-                  time={currentBooking.createdAt}
+                  time={parseCreatedAt(rejectedApproval.actionTime)}
                   sub={rejectedApproval.remarks || "No reason provided"}
                   subClass="text-red-600"
                 />
@@ -328,73 +488,181 @@ export default function BookingDetailPage() {
                   icon={<CheckCircle className="w-4 h-4 text-blue-500" />}
                   color="bg-blue-500/10"
                   label="Confirmed & Paid"
+                  time={parseCreatedAt(currentBooking.createdAt)}
+                />
+              )}
+
+              {status === "PAID" && (
+                <TimelineStep
+                  icon={<CheckCircle className="w-4 h-4 text-blue-500" />}
+                  color="bg-blue-500/10"
+                  label="Payment Received"
+                  time={parseCreatedAt(currentBooking.createdAt)}
+                />
+              )}
+
+              {status === "CONFIRMED" && (
+                <TimelineStep
+                  icon={<CheckCircle className="w-4 h-4 text-blue-500" />}
+                  color="bg-blue-500/10"
+                  label="Confirmed"
+                  time={parseCreatedAt(currentBooking.createdAt)}
                 />
               )}
             </div>
           </Card>
 
+          {/* Approval History */}
+          {currentBooking.approvals && currentBooking.approvals.length > 0 && (
+            <Card>
+              <h3 className="text-base font-bold text-rotary-royal mb-4 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                Approval History
+              </h3>
+              <div className="space-y-3">
+                {currentBooking.approvals.map((approval, idx) => (
+                  <div
+                    key={approval.id ?? idx}
+                    className="border border-gray-200 rounded-lg p-3 hover:border-gray-300 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-sm">
+                        Level {approval.levelNumber} Approval
+                      </span>
+                      <Badge
+                        variant={
+                          approval.status === "APPROVED" ? "active" : "inactive"
+                        }
+                      >
+                        {approval.status}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-rotary-darkgray space-y-1">
+                      {/* <p>
+                        Approver:{" "}
+                        <span className="font-medium">
+                          {approval.approverUserId?.slice(0, 8) || "N/A"}
+                        </span>
+                      </p> */}
+                      <p>
+                        Time:{" "}
+                        <span className="font-medium">
+                          {parseCreatedAt(approval.actionTime)}
+                        </span>
+                      </p>
+                      {approval.remarks && (
+                        <p>
+                          Remarks:{" "}
+                          <span className="font-medium">{approval.remarks}</span>
+                        </p>
+                      )}
+                      {!approval.remarks && approval.status === "REJECTED" && (
+                        <p className="text-red-600">No remarks provided</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Booked Slots */}
           <Card>
-            <h3 className="text-base font-bold text-rotary-royal mb-4">
+            <h3 className="text-base font-bold text-rotary-royal mb-4 flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
               Booked Slots ({currentBooking.items?.length || 0})
             </h3>
             {!currentBooking.items?.length ? (
-              <p className="text-sm text-rotary-darkgray">No slots found.</p>
+              <div className="text-center py-8 text-rotary-darkgray">
+                <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No slots booked yet.</p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {currentBooking.items.map((item, idx) => {
-                  const facilityName = facilityNames[item.facilityId] ||
+                  const facilityName =
+                    facilityNames[item.facilityId] ||
                     item.facilityName ||
                     `Facility ${item.facilityId?.slice(0, 8)}`;
 
                   return (
                     <div
                       key={item.id ?? idx}
-                      className="border border-gray-200 rounded-lg p-4"
+                      className="border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-colors"
                     >
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
-                          <div className="font-medium text-rotary-black">
+                          <div className="font-semibold text-rotary-black text-sm mb-1">
                             {facilityName}
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-rotary-darkgray">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              {parseEventDate(item.eventDate)}
-                            </span>
-                            {(item.startTime || item.endTime) && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-4 h-4" />
-                                {item.startTime?.slice(0, 5) ?? "?"} –{" "}
-                                {item.endTime?.slice(0, 5) ?? "?"}
-                              </span>
-                            )}
-                            {item.slotName && (
-                              <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
-                                {item.slotName}
-                              </span>
-                            )}
-                          </div>
                           {item.status && (
-                            <div className="mt-2">
-                              <Badge
-                                variant={
-                                  item.status === "APPROVED" ||
-                                    item.status === "CONFIRMED_FULL"
-                                    ? "active"
-                                    : item.status === "PENDING" || item.status === "PENDING_APPROVAL"
-                                      ? "pending"
-                                      : "inactive"
-                                }
-                              >
-                                {item.status}
-                              </Badge>
-                            </div>
+                            <Badge
+                              variant={
+                                item.status === "APPROVED" ||
+                                item.status === "CONFIRMED_FULL"
+                                  ? "active"
+                                  : item.status === "PENDING" ||
+                                    item.status === "PENDING_APPROVAL"
+                                  ? "pending"
+                                  : "inactive"
+                              }
+                            >
+                              {item.status}
+                            </Badge>
                           )}
                         </div>
-                        <div className="text-lg font-bold text-rotary-royal ml-4">
-                          ₹{item.price != null ? item.price.toLocaleString("en-IN") : "—"}
+                        <div className="flex items-center gap-1.5 text-base font-bold text-rotary-royal bg-blue-50 px-3 py-1.5 rounded-lg">
+                          <IndianRupee className="w-4 h-4" />
+                          {item.price != null
+                            ? item.price.toLocaleString("en-IN")
+                            : "—"}
                         </div>
                       </div>
+
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-rotary-darkgray">
+                        <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200 whitespace-nowrap">
+                          <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                          {parseEventDate(item.eventDate)}
+                        </span>
+
+                        {(item.startTime || item.endTime) && (
+                          <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200 whitespace-nowrap">
+                            <Clock className="w-3.5 h-3.5 text-purple-500" />
+                            {item.startTime?.slice(0, 5) ?? "N/A"} -{" "}
+                            {item.endTime?.slice(0, 5) ?? "N/A"}
+                          </span>
+                        )}
+
+                        {item.pax && (
+                          <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200 whitespace-nowrap">
+                            <Users className="w-3.5 h-3.5 text-green-500" />
+                            {item.pax} Pax
+                          </span>
+                        )}
+
+                        {item.slotName && (
+                          <span className="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200 whitespace-nowrap">
+                            <Hash className="w-3.5 h-3.5 text-gray-400" />
+                            {item.slotName}
+                          </span>
+                        )}
+                      </div>
+
+                      {item.alternatives && item.alternatives.length > 0 && (
+                        <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-xs font-medium text-yellow-800 mb-1">
+                            Alternatives Available:
+                          </p>
+                          <div className="text-xs text-yellow-700">
+                            {item.alternatives.map((alt, altIdx) => (
+                              <div key={altIdx} className="flex items-center gap-1">
+                                <span>•</span>
+                                <span>{alt}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -402,29 +670,39 @@ export default function BookingDetailPage() {
             )}
           </Card>
 
+          {/* Event Details */}
           {currentBooking.eventDetails && (
             <Card>
-              <h3 className="text-base font-bold text-rotary-royal mb-4">
+              <h3 className="text-base font-bold text-rotary-royal mb-4 flex items-center gap-2">
+                <FileText className="w-4 h-4" />
                 Event Details
               </h3>
               <div className="space-y-3">
-                <DetailRow
-                  label="Purpose"
-                  value={currentBooking.eventDetails.purpose}
-                />
-                <DetailRow
-                  label="Expected Attendees"
-                  value={
-                    <span className="flex items-center gap-1">
-                      <Users className="w-4 h-4" />
-                      {currentBooking.eventDetails.expectedAttendees}
-                    </span>
-                  }
-                />
+                {currentBooking.eventDetails.purpose && (
+                  <DetailRow
+                    label="Purpose"
+                    value={currentBooking.eventDetails.purpose}
+                  />
+                )}
+                {currentBooking.eventDetails.expectedAttendees && (
+                  <DetailRow
+                    label="Expected Attendees"
+                    value={
+                      <span className="flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-gray-400" />
+                        {currentBooking.eventDetails.expectedAttendees}
+                      </span>
+                    }
+                  />
+                )}
                 {currentBooking.eventDetails.specialRequirements && (
                   <DetailRow
                     label="Special Requirements"
-                    value={currentBooking.eventDetails.specialRequirements}
+                    value={
+                      <p className="text-sm text-rotary-black whitespace-pre-wrap">
+                        {currentBooking.eventDetails.specialRequirements}
+                      </p>
+                    }
                   />
                 )}
               </div>
@@ -432,18 +710,23 @@ export default function BookingDetailPage() {
           )}
         </div>
 
+        {/* Sidebar Summary */}
         <div className="lg:col-span-1">
           <Card className="sticky top-5">
-            <h3 className="text-base font-bold text-rotary-royal mb-4">
+            <h3 className="text-base font-bold text-rotary-royal mb-4 flex items-center gap-2">
+              <FileText className="w-4 h-4" />
               Summary
             </h3>
 
             <div className="space-y-3 mb-4">
               <SummaryRow
+                icon={<Hash className="w-3.5 h-3.5 text-gray-400" />}
                 label="Booking Code"
                 value={currentBooking.bookingCode || "N/A"}
               />
+
               <SummaryRow
+                icon={<User className="w-3.5 h-3.5 text-gray-400" />}
                 label="User"
                 value={
                   currentBooking.userName ||
@@ -452,16 +735,46 @@ export default function BookingDetailPage() {
                   "—"
                 }
               />
+
               <SummaryRow
+                icon={<Calendar className="w-3.5 h-3.5 text-gray-400" />}
+                label="Created"
+                value={parseCreatedAt(currentBooking.createdAt)}
+              />
+
+              {currentBooking.items && currentBooking.items.length > 0 && (
+                <SummaryRow
+                  icon={<Calendar className="w-3.5 h-3.5 text-gray-400" />}
+                  label="Event Dates"
+                  value={getDateRange()}
+                />
+              )}
+
+              <SummaryRow
+                icon={<Clock className="w-3.5 h-3.5 text-gray-400" />}
                 label="Slots"
                 value={String(currentBooking.items?.length ?? 0)}
               />
+
+              {getTotalPax() > 0 && (
+                <SummaryRow
+                  icon={<Users className="w-3.5 h-3.5 text-gray-400" />}
+                  label="Total Pax"
+                  value={String(getTotalPax())}
+                />
+              )}
+
               <SummaryRow
+                icon={<AlertCircle className="w-3.5 h-3.5 text-gray-400" />}
                 label="Status"
                 value={<Badge variant="pending">{statusLabel}</Badge>}
               />
+
               <div className="border-t border-gray-200 pt-3 flex items-center justify-between">
-                <span className="font-bold">Total</span>
+                <span className="font-bold text-sm flex items-center gap-1.5">
+                  <IndianRupee className="w-4 h-4 text-gray-500" />
+                  Total
+                </span>
                 <span className="text-xl font-bold text-rotary-royal">
                   ₹
                   {currentBooking.totalAmount != null
@@ -471,9 +784,11 @@ export default function BookingDetailPage() {
               </div>
             </div>
 
+            {/* Payment Link Alert */}
             {currentBooking.paymentLink && (
               <div className="mb-4 p-3 bg-rotary-turquoise/10 border border-rotary-turquoise rounded-lg">
-                <div className="text-sm font-medium text-rotary-royal mb-2">
+                <div className="text-sm font-medium text-rotary-royal mb-2 flex items-center gap-1.5">
+                  <ExternalLink className="w-4 h-4" />
                   Payment Link Available
                 </div>
                 <a
@@ -488,20 +803,21 @@ export default function BookingDetailPage() {
               </div>
             )}
 
+            {/* Action Buttons */}
             <div className="space-y-2">
               {canPay && !currentBooking.paymentLink && (
                 <Button
                   fullWidth
-                  onClick={handleGeneratePaymentLink}
                   disabled={generatingPayment}
+                  title="Check your email for the payment link"
                 >
                   {generatingPayment ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generating…
+                      Generating...
                     </>
                   ) : (
-                    "Generate Payment Link"
+                    "Check Email for Payment Link"
                   )}
                 </Button>
               )}
@@ -527,6 +843,7 @@ export default function BookingDetailPage() {
                     setCancelModalOpen(true);
                   }}
                 >
+                  <XCircle className="w-4 h-4 mr-2" />
                   Cancel Booking
                 </Button>
               )}
@@ -536,13 +853,15 @@ export default function BookingDetailPage() {
                 variant="ghost"
                 onClick={() => router.push("/user/booking-status")}
               >
-                ← Back to My Bookings
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Back to My Bookings
               </Button>
             </div>
           </Card>
         </div>
       </div>
 
+      {/* Cancel Booking Modal */}
       <Modal
         isOpen={cancelModalOpen}
         onClose={() => !cancelling && setCancelModalOpen(false)}
@@ -572,10 +891,13 @@ export default function BookingDetailPage() {
               {cancelling ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Cancelling…
+                  Cancelling...
                 </>
               ) : (
-                "Confirm Cancellation"
+                <>
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Confirm Cancellation
+                </>
               )}
             </Button>
             <Button
@@ -595,6 +917,8 @@ export default function BookingDetailPage() {
     </Layout>
   );
 }
+
+// ============ Helper Components ============
 
 function TimelineStep({
   icon,
@@ -618,14 +942,14 @@ function TimelineStep({
       >
         {icon}
       </div>
-      <div>
+      <div className="flex-1">
         <div className="font-medium text-sm">{label}</div>
-        {time && (
-          <div className="text-xs text-rotary-darkgray">
-            {time}
-          </div>
+        {time && time !== "N/A" && (
+          <div className="text-xs text-rotary-darkgray mt-0.5">{time}</div>
         )}
-        {sub && <div className={`text-xs mt-0.5 ${subClass}`}>{sub}</div>}
+        {sub && (
+          <div className={`text-xs mt-0.5 ${subClass}`}>{sub}</div>
+        )}
       </div>
     </div>
   );
@@ -640,23 +964,30 @@ function DetailRow({
 }) {
   return (
     <div>
-      <div className="text-sm font-medium text-rotary-darkgray">{label}</div>
-      <div className="text-rotary-black mt-0.5">{value}</div>
+      <div className="text-xs font-medium text-rotary-darkgray mb-1">
+        {label}
+      </div>
+      <div className="text-sm text-rotary-black">{value}</div>
     </div>
   );
 }
 
 function SummaryRow({
+  icon,
   label,
   value,
 }: {
+  icon?: React.ReactNode;
   label: string;
   value: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-rotary-darkgray">{label}</span>
-      <span className="font-medium">{value}</span>
+    <div className="flex items-center justify-between text-sm py-1.5 border-b border-gray-100 last:border-0">
+      <span className="text-rotary-darkgray flex items-center gap-1.5">
+        {icon}
+        {label}
+      </span>
+      <span className="font-medium text-right">{value}</span>
     </div>
   );
 }

@@ -304,7 +304,7 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
             {/* Upcoming Bookings & Quick Actions */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                <BookingsTile bookings={initialData.upcomingBookings || []} isAdmin={false} title="Upcoming Bookings" />
+                <BookingsTile bookings={initialData.upcomingBookings || []} isAdmin={false} title="My Bookings" />
               </div>
               <div>
                 <QuickActionsTile onAction={handleQuickAction} />

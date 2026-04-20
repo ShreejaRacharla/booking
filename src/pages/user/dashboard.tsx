@@ -36,7 +36,7 @@ interface Booking {
   status: string;
   totalAmount: number;
   items?: BookingItem[];
-  createdAt?: number;
+  createdAt?: number | string | number[];
 }
 
 interface User {
@@ -68,7 +68,7 @@ interface ProcessedBooking {
   totalAmount: number;
   slots: BookingItem[];
   slotCount: number;
-  timeRanges: string;
+  createdAt: string;
 }
 
 function decodeJWT(token: string): DecodedToken | null {
@@ -108,17 +108,20 @@ function getUserIdFromToken(): string | null {
   }
 }
 
-function formatDate(dateArray: number[] | string | undefined): string {
+function formatDateYYYYMMDD(dateArray: number[] | string | undefined): string {
   try {
     if (!dateArray) return 'N/A';
     
     if (Array.isArray(dateArray) && dateArray.length >= 3) {
       const [year, month, day] = dateArray;
-      return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+      return `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
     }
     if (typeof dateArray === 'string') {
       const date = new Date(dateArray);
-      return date.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}/${month}/${day}`;
     }
     return 'N/A';
   } catch {
@@ -126,20 +129,39 @@ function formatDate(dateArray: number[] | string | undefined): string {
   }
 }
 
-function formatTime(timeString: string): string {
+function formatCreatedAt(createdAt: number | string | number[] | undefined): string {
   try {
-    if (!timeString) return 'N/A';
-    const parts = timeString.split(':');
-    if (parts.length >= 2) {
-      const hour = parseInt(parts[0]);
-      const minute = parts[1];
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      const displayHour = hour % 12 || 12;
-      return `${displayHour}:${minute} ${ampm}`;
+    if (!createdAt) return 'N/A';
+    
+    let date: Date;
+    
+    if (Array.isArray(createdAt)) {
+      if (createdAt.length >= 6) {
+        const [year, month, day, hour, minute, second] = createdAt;
+        date = new Date(year, month - 1, day, hour, minute, second);
+      } else if (createdAt.length >= 3) {
+        const [year, month, day] = createdAt;
+        date = new Date(year, month - 1, day);
+      } else {
+        return 'N/A';
+      }
+    } else if (typeof createdAt === 'number') {
+      date = new Date(createdAt);
+    } else if (typeof createdAt === 'string') {
+      date = new Date(createdAt);
+    } else {
+      return 'N/A';
     }
-    return timeString;
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${year}/${month}/${day} ${hours}:${minutes}`;
   } catch {
-    return timeString;
+    return 'N/A';
   }
 }
 
@@ -205,19 +227,6 @@ export default function DashboardPage() {
         const totalRevenue = bookings
           .filter((b: Booking) => b.status === 'CONFIRMED_FULL')
           .reduce((sum: number, b: Booking) => sum + (b.totalAmount || 0), 0)
-
-        const getSlotDetails = (slotId: string): SlotDetail => {
-          const slot = timeSlots.find((ts: TimeSlot) => ts.id === slotId)
-          return slot ? {
-            name: slot.name || 'Unknown Slot',
-            startTime: slot.startTime || '00:00:00',
-            endTime: slot.endTime || '23:59:59'
-          } : {
-            name: 'Unknown Slot',
-            startTime: '00:00:00',
-            endTime: '23:59:59'
-          }
-        }
 
         const today = new Date()
         today.setHours(0, 0, 0, 0)
@@ -291,28 +300,16 @@ export default function DashboardPage() {
             const firstItem = booking.items?.[0]
             const eventDate = firstItem?.eventDate
 
-            const slotDetails: SlotDetail[] = booking.items?.map((item: BookingItem) => {
-              const slot = getSlotDetails(item.slotId)
-              return {
-                ...slot,
-                date: formatDate(item.eventDate)
-              }
-            }) || []
-
-            const timeRanges = [...new Set(slotDetails.map((s: SlotDetail) => 
-              `${formatTime(s.startTime)}-${formatTime(s.endTime)}`
-            ))].join(', ')
-
             return {
               id: booking.bookingCode || booking.id,
               bookingCode: booking.bookingCode,
               facilityName: facilityNames.join(', ') || 'Unknown Facility',
-              date: formatDate(eventDate),
+              date: formatDateYYYYMMDD(eventDate),
               status: booking.status,
               totalAmount: booking.totalAmount || 0,
               slots: booking.items || [],
               slotCount: booking.items?.length || 0,
-              timeRanges: timeRanges || 'N/A'
+              createdAt: formatCreatedAt(booking.createdAt)
             }
           })
 

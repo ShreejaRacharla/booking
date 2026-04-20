@@ -272,7 +272,7 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
           <div className="text-xs text-rotary-darkgray flex items-center gap-1">
             <Calendar className="w-3 h-3" />
             {items[0]?.eventDate
-              ? formatDisplayDate(items[0].eventDate)
+              ? formatDisplayDate(typeof items[0].eventDate === "string" ? items[0].eventDate : "")
               : "N/A"}
           </div>
           {items.length > 1 && (
@@ -515,7 +515,7 @@ export default function ApprovalsPage({ embedded = false }: { embedded?: boolean
                       <div className="flex items-center gap-3 mt-1 text-xs text-rotary-darkgray">
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {formatDisplayDate(item.eventDate)}
+                          {formatDisplayDate(typeof item.eventDate === "string" ? item.eventDate : "")}
                         </span>
                         {item.startTime && item.endTime && (
                           <span className="flex items-center gap-1">

@@ -11,7 +11,10 @@ export type BadgeVariant =
   | "approved"
   | "rejected"
   | "paid"
-  | "conflict";
+  | "conflict"
+  | "cancelled"
+  | "submitted"
+  | "confirmed";
 
 export interface TimeSlot {
   id: string;
@@ -98,15 +101,16 @@ export interface BookingItem {
   id?: string;
   facilityId: string;
   facilityName?: string;
-  eventDate: string;
+  eventDate: string | string[] | number[];
   slotId: string;
   slotName?: string;
   startTime?: string;
   endTime?: string;
   price: number;
+  pax?: number;
   status?: BookingStatus;
   isActive?: boolean;
-  alternatives?: BookingItem[];
+  alternatives?: string[];
 }
 
 export interface BookingApproval {
@@ -114,9 +118,20 @@ export interface BookingApproval {
   approverUserId: string;
   levelNumber: number;
   status: "PENDING" | "APPROVED" | "REJECTED";
-  actionTime: string | null;
+  actionTime: string | string[] | number[] | null;
   remarks: string | null;
   isActive: boolean;
+}
+
+export interface EventDetails {
+  purpose?: string;
+  expectedAttendees?: number;
+  specialRequirements?: string;
+  location?: string;
+  description?: string;
+  organizerName?: string;
+  organizerPhone?: string;
+  organizerEmail?: string;
 }
 
 export interface Booking {
@@ -131,16 +146,15 @@ export interface Booking {
   status: BookingStatus;
   approvals?: BookingApproval[];
   previousBookingId?: string | null;
-  eventDetails?: {
-    purpose: string;
-    expectedAttendees: number;
-    specialRequirements?: string;
-  };
+  eventDetails?: EventDetails;
   rejectionReason?: string;
+  cancellationReason?: string;
   approvedAt?: string;
   rejectedAt?: string;
+  cancelledAt?: string;
   approvedBy?: string;
-  createdAt: string;
+  createdAt: string | string[] | number[];
+  updatedAt?: string | string[] | number[];
   isActive: boolean;
   paymentLink?: string;
   paymentId?: string;
@@ -152,20 +166,16 @@ export interface BookingDraftItem {
   eventDate: string;
   slotId: string;
   price: number;
+  pax?: number;
 }
 
 export interface BookingDraftRequest {
   userId: string;
   items: BookingDraftItem[];
-  eventDetails?: {
-    purpose: string;
-    expectedAttendees: number;
-    specialRequirements?: string;
-  };
+  eventDetails?: EventDetails;
 }
 
-
-export type UserRole = "admin" | "member";
+export type UserRole = "admin" | "member" | "approver" | "super_admin";
 
 export interface User {
   id: string;
@@ -178,7 +188,9 @@ export interface User {
   club?: string;
   phone?: string;
   userId?: string;
-  roles?: any[];
+  roles?: UserRole[];
+  approvalLevel?: number;
+  assignedLocations?: string[];
 }
 
 export interface ApprovalAction {
@@ -201,6 +213,7 @@ export interface AvailabilityQueryParams {
   facilityId?: string;
   fromDate?: string;
   toDate?: string;
+  status?: SlotStatus;
 }
 
 export interface GenerateAvailabilityRequest {
@@ -246,7 +259,7 @@ export interface MasterDataRequest {
     approverUserName: string;
     facilities: {
       name: string;
-      type: string;
+      type: FacilityType;
       capacity: number;
     }[];
   }[];
@@ -256,9 +269,52 @@ export interface Column {
   key: string;
   label: string;
   render?: (value: any, row: any, index?: number) => ReactNode;
+  sortable?: boolean;
+  width?: string;
 }
 
 export interface SelectOption {
   value: string;
   label: string;
+  disabled?: boolean;
+}
+
+export interface PaginationParams {
+  page: number;
+  limit: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data?: T;
+  error?: string;
+}
+
+export interface BookingFilter {
+  status?: BookingStatus;
+  userId?: string;
+  facilityId?: string;
+  fromDate?: string;
+  toDate?: string;
+  searchTerm?: string;
+}
+
+export interface BookingStats {
+  totalBookings: number;
+  pendingApprovals: number;
+  awaitingPayment: number;
+  confirmed: number;
+  cancelled: number;
+  totalRevenue: number;
 }

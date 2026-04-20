@@ -267,19 +267,19 @@ export const rejectBookingAPI = createAsyncThunk(
   }
 );
 
-export const generatePaymentLinkAPI = createAsyncThunk(
-  "bookings/generatePaymentLink",
-  async (bookingId: string, { rejectWithValue }) => {
-    try {
-      const res = await generatePaymentLink(bookingId);
-      return res.data;
-    } catch (err: any) {
-      return rejectWithValue(
-        err?.response?.data?.message || err?.message || "Failed to generate payment link"
-      );
-    }
-  }
-);
+// export const generatePaymentLinkAPI = createAsyncThunk(
+//   "bookings/generatePaymentLink",
+//   async (bookingId: string, { rejectWithValue }) => {
+//     try {
+//       const res = await generatePaymentLink(bookingId);
+//       return res.data;
+//     } catch (err: any) {
+//       return rejectWithValue(
+//         err?.response?.data?.message || err?.message || "Failed to generate payment link"
+//       );
+//     }
+//   }
+// );
 
 export const confirmBookingPayment = createAsyncThunk(
   "booking/confirmPayment",
@@ -473,13 +473,13 @@ const bookingSlice = createSlice({
       }
     });
 
-    builder.addCase(generatePaymentLinkAPI.fulfilled, (state, action) => {
-      if (state.currentBooking) {
-        const d = action.payload;
-        state.currentBooking.paymentLink =
-          d?.paymentLink ?? d?.link ?? d ?? undefined;
-      }
-    });
+    // builder.addCase(generatePaymentLinkAPI.fulfilled, (state, action) => {
+    //   if (state.currentBooking) {
+    //     const d = action.payload;
+    //     state.currentBooking.paymentLink =
+    //       d?.paymentLink ?? d?.link ?? d ?? undefined;
+    //   }
+    // });
   },
 });
 
