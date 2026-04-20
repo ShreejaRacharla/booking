@@ -79,21 +79,16 @@ const STATUS_LABELS: Record<string, string> = {
   CONFIRMED: "Confirmed",
 };
 
-// ============ FIXED DATE PARSING FUNCTIONS ============
-
 function parseEventDate(eventDate: any): string {
   if (!eventDate) return "N/A";
 
   try {
     let date: Date;
-
-    // Handle string format: "2026-04-27"
     if (typeof eventDate === "string") {
       if (/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
         const [year, month, day] = eventDate.split("-");
         return `${year}/${month}/${day}`;
       }
-      // Handle other string formats
       date = new Date(eventDate);
       if (!isNaN(date.getTime())) {
         const year = date.getFullYear();
@@ -103,7 +98,6 @@ function parseEventDate(eventDate: any): string {
       }
     }
 
-    // Handle array format: [2026, 4, 27]
     if (Array.isArray(eventDate)) {
       if (eventDate.length >= 3) {
         const year = eventDate[0];
@@ -113,7 +107,6 @@ function parseEventDate(eventDate: any): string {
       }
     }
 
-    // Handle number (timestamp)
     if (typeof eventDate === "number") {
       date = new Date(eventDate);
       if (!isNaN(date.getTime())) {
@@ -137,21 +130,17 @@ function parseCreatedAt(createdAt: any): string {
   try {
     let date: Date;
 
-    // Handle string format: "2026-04-17 16:01 PM"
     if (typeof createdAt === "string") {
-      // Remove "AM/PM" and clean up the string
       const cleanedString = createdAt
         .replace(/\s?(AM|PM)/i, "")
         .trim();
 
-      // Try parsing as is
       date = new Date(cleanedString);
       
       if (!isNaN(date.getTime())) {
         return formatDate(date);
       }
 
-      // Try alternative parsing with regex
       const match = createdAt.match(
         /(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/
       );
@@ -168,7 +157,6 @@ function parseCreatedAt(createdAt: any): string {
       }
     }
 
-    // Handle array format: [2026, 4, 17, 16, 1, 0]
     if (Array.isArray(createdAt)) {
       if (createdAt.length >= 6) {
         const [year, month, day, hour, minute, second] = createdAt;
@@ -181,7 +169,6 @@ function parseCreatedAt(createdAt: any): string {
       }
     }
 
-    // Handle number (timestamp)
     if (typeof createdAt === "number") {
       date = new Date(createdAt);
       if (!isNaN(date.getTime())) {
@@ -196,7 +183,6 @@ function parseCreatedAt(createdAt: any): string {
   }
 }
 
-// Helper function to format date consistently
 function formatDate(date: Date): string {
   if (isNaN(date.getTime())) return "N/A";
 
@@ -228,14 +214,12 @@ export default function BookingDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [facilityNames, setFacilityNames] = useState<Record<string, string>>({});
 
-  // Fetch facilities if not already loaded
   useEffect(() => {
     if (!facilities.length) {
       dispatch(fetchFacilities() as any);
     }
   }, [dispatch, facilities.length]);
 
-  // Fetch booking details
   useEffect(() => {
     if (isReady && id) {
       dispatch(fetchBookingById(id) as any);
@@ -245,7 +229,6 @@ export default function BookingDetailPage() {
     };
   }, [isReady, id, dispatch]);
 
-  // Map facility IDs to names
   useEffect(() => {
     if (currentBooking?.items && facilities.length > 0) {
       const names: Record<string, string> = {};
@@ -373,7 +356,6 @@ export default function BookingDetailPage() {
   ].includes(status);
   const canPay = ["APPROVED", "APPROVED_PENDING_PAYMENT"].includes(status);
 
-  // Calculate date range
   const getDateRange = () => {
     if (!currentBooking.items || currentBooking.items.length === 0)
       return "N/A";
@@ -413,7 +395,6 @@ export default function BookingDetailPage() {
     return `${startDate} to ${endDate}`;
   };
 
-  // Calculate total pax
   const getTotalPax = () => {
     if (!currentBooking.items) return 0;
     return currentBooking.items.reduce((sum, item) => sum + (item.pax || 0), 0);
@@ -430,7 +411,6 @@ export default function BookingDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
-          {/* Booking Status Timeline */}
           <Card>
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-bold text-rotary-royal flex items-center gap-2">
@@ -512,7 +492,6 @@ export default function BookingDetailPage() {
             </div>
           </Card>
 
-          {/* Approval History */}
           {currentBooking.approvals && currentBooking.approvals.length > 0 && (
             <Card>
               <h3 className="text-base font-bold text-rotary-royal mb-4 flex items-center gap-2">
@@ -566,7 +545,6 @@ export default function BookingDetailPage() {
             </Card>
           )}
 
-          {/* Booked Slots */}
           <Card>
             <h3 className="text-base font-bold text-rotary-royal mb-4 flex items-center gap-2">
               <Calendar className="w-4 h-4" />
@@ -670,7 +648,6 @@ export default function BookingDetailPage() {
             )}
           </Card>
 
-          {/* Event Details */}
           {currentBooking.eventDetails && (
             <Card>
               <h3 className="text-base font-bold text-rotary-royal mb-4 flex items-center gap-2">
@@ -710,7 +687,6 @@ export default function BookingDetailPage() {
           )}
         </div>
 
-        {/* Sidebar Summary */}
         <div className="lg:col-span-1">
           <Card className="sticky top-5">
             <h3 className="text-base font-bold text-rotary-royal mb-4 flex items-center gap-2">
@@ -784,7 +760,6 @@ export default function BookingDetailPage() {
               </div>
             </div>
 
-            {/* Payment Link Alert */}
             {currentBooking.paymentLink && (
               <div className="mb-4 p-3 bg-rotary-turquoise/10 border border-rotary-turquoise rounded-lg">
                 <div className="text-sm font-medium text-rotary-royal mb-2 flex items-center gap-1.5">
@@ -803,7 +778,6 @@ export default function BookingDetailPage() {
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="space-y-2">
               {canPay && !currentBooking.paymentLink && (
                 <Button
@@ -861,7 +835,6 @@ export default function BookingDetailPage() {
         </div>
       </div>
 
-      {/* Cancel Booking Modal */}
       <Modal
         isOpen={cancelModalOpen}
         onClose={() => !cancelling && setCancelModalOpen(false)}
@@ -917,8 +890,6 @@ export default function BookingDetailPage() {
     </Layout>
   );
 }
-
-// ============ Helper Components ============
 
 function TimelineStep({
   icon,

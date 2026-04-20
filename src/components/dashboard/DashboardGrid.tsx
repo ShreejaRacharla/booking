@@ -270,9 +270,7 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
 
       <div className="px-6">
         {isAdmin ? (
-          // Admin Dashboard Layout
           <>
-            {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
               <StatCard label="Time Slots" value={initialData.timeSlots || 0} delta="+12%" colorKey="timeslots" isAdmin />
               <StatCard label="Locations" value={initialData.locations || 0} delta="Active" colorKey="locations" isAdmin />
@@ -287,13 +285,10 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
               <StatCard label="Total Revenue" value={`₹${(initialData.totalRevenue || 0).toLocaleString('en-IN')}`} delta="+8%" colorKey="revenue" isAdmin />
             </div>
 
-            {/* Recent Bookings */}
             <BookingsTile bookings={initialData.recentBookings || []} isAdmin={true} title="Recent Bookings" />
           </>
         ) : (
-          // User Dashboard Layout
           <>
-            {/* User Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
               <StatCard label="My Bookings" value={initialData.myBookings || 0} delta="Total" colorKey="myBookings" isAdmin={false} />
               <StatCard label="Pending" value={initialData.myPendingBookings || 0} delta="Awaiting" deltaPositive={false} colorKey="pending" isAdmin={false} />
@@ -301,7 +296,6 @@ export default function DashboardGrid({ initialData }: { initialData: DashboardD
               <StatCard label="Total Spent" value={`₹${(initialData.myTotalSpent || 0).toLocaleString('en-IN')}`} delta="This year" colorKey="spent" isAdmin={false} />
             </div>
 
-            {/* Upcoming Bookings & Quick Actions */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
                 <BookingsTile bookings={initialData.upcomingBookings || []} isAdmin={false} title="My Bookings" />

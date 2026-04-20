@@ -24,7 +24,6 @@ const variantClasses: Record<BadgeVariant, string> = {
   paid: "bg-rotary-royal/15 text-rotary-royal border-rotary-royal/30",
   conflict:
     "bg-rotary-cranberry/15 text-rotary-cranberry border-rotary-cranberry/30",
-  // ✅ Added missing variants
   cancelled: "bg-gray-400/15 text-gray-600 border-gray-400/30",
   submitted: "bg-rotary-gold/15 text-yellow-700 border-rotary-gold/30",
   confirmed: "bg-rotary-royal/15 text-rotary-royal border-rotary-royal/30",
